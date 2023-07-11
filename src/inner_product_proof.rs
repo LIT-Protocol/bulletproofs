@@ -7,25 +7,24 @@ use super::CtOptionOps;
 use alloc::borrow::Borrow;
 use alloc::vec::Vec;
 
-use bls12_381_plus::{G1Affine, G1Projective, Scalar};
 use core::iter;
-use group::Curve;
+use group::ff::Field;
 use merlin::Transcript;
 use subtle::ConstantTimeEq;
 
 use crate::errors::ProofError;
 use crate::transcript::TranscriptProtocol;
-use crate::util::ScalarBatchInvert;
+use crate::types::*;
 
 #[derive(Clone, Debug)]
-pub struct InnerProductProof {
-    pub(crate) L_vec: Vec<G1Projective>,
-    pub(crate) R_vec: Vec<G1Projective>,
-    pub(crate) a: Scalar,
-    pub(crate) b: Scalar,
+pub struct InnerProductProof<C: BulletproofCurveArithmetic> {
+    pub(crate) L_vec: Vec<C::Point>,
+    pub(crate) R_vec: Vec<C::Point>,
+    pub(crate) a: C::Scalar,
+    pub(crate) b: C::Scalar,
 }
 
-impl InnerProductProof {
+impl<C: BulletproofCurveArithmetic> InnerProductProof<C> {
     /// Create an inner-product proof.
     ///
     /// The proof is created with respect to the bases \\(G\\), \\(H'\\),
@@ -39,14 +38,14 @@ impl InnerProductProof {
     /// either 0 or a power of 2.
     pub fn create(
         transcript: &mut Transcript,
-        Q: &G1Projective,
-        G_factors: &[Scalar],
-        H_factors: &[Scalar],
-        mut G_vec: Vec<G1Projective>,
-        mut H_vec: Vec<G1Projective>,
-        mut a_vec: Vec<Scalar>,
-        mut b_vec: Vec<Scalar>,
-    ) -> InnerProductProof {
+        Q: &C::Point,
+        G_factors: &[C::Scalar],
+        H_factors: &[C::Scalar],
+        mut G_vec: Vec<C::Point>,
+        mut H_vec: Vec<C::Point>,
+        mut a_vec: Vec<C::Scalar>,
+        mut b_vec: Vec<C::Scalar>,
+    ) -> Self {
         // Create slices G, H, a, b backed by their respective
         // vectors.  This lets us reslice as we compress the lengths
         // of the vectors in the main loop below.
@@ -83,64 +82,64 @@ impl InnerProductProof {
             let (G_L, G_R) = G.split_at_mut(n);
             let (H_L, H_R) = H.split_at_mut(n);
 
-            let c_L = inner_product(a_L, b_R);
-            let c_R = inner_product(a_R, b_L);
+            let c_L = inner_product::<C>(a_L, b_R);
+            let c_R = inner_product::<C>(a_R, b_L);
 
-            let L_scalars: Vec<Scalar> = a_L
+            let L_scalars: Vec<C::Scalar> = a_L
                 .iter()
                 .zip(G_factors[n..2 * n].iter())
-                .map(|(a_L_i, g)| a_L_i * g)
+                .map(|(a_L_i, g)| *a_L_i * *g)
                 .chain(
                     b_R.iter()
                         .zip(H_factors[0..n].iter())
-                        .map(|(b_R_i, h)| b_R_i * h),
+                        .map(|(b_R_i, h)| *b_R_i * *h),
                 )
                 .chain(iter::once(c_L))
                 .collect();
-            let L_points: Vec<G1Projective> = G_R
+            let L_points: Vec<C::Point> = G_R
                 .iter()
                 .copied()
                 .chain(H_L.iter().copied())
                 .chain(iter::once(*Q))
                 .collect();
-            let L = G1Projective::sum_of_products(&L_points, &L_scalars);
+            let L = C::pippenger_sum_of_products(&L_points, &L_scalars);
 
-            let R_scalars: Vec<Scalar> = a_R
+            let R_scalars: Vec<C::Scalar> = a_R
                 .iter()
                 .zip(G_factors[0..n].iter())
-                .map(|(a_R_i, g)| a_R_i * g)
+                .map(|(a_R_i, g)| *a_R_i * *g)
                 .chain(
                     b_L.iter()
                         .zip(H_factors[n..2 * n].iter())
-                        .map(|(b_L_i, h)| b_L_i * h),
+                        .map(|(b_L_i, h)| *b_L_i * *h),
                 )
                 .chain(iter::once(c_R))
                 .collect();
-            let R_points: Vec<G1Projective> = G_L
+            let R_points: Vec<C::Point> = G_L
                 .iter()
                 .copied()
                 .chain(H_R.iter().copied())
                 .chain(iter::once(*Q))
                 .collect();
-            let R = G1Projective::sum_of_products(&R_points, &R_scalars);
+            let R = C::pippenger_sum_of_products(&R_points, &R_scalars);
 
             L_vec.push(L);
             R_vec.push(R);
 
-            transcript.append_point(b"L", &L);
-            transcript.append_point(b"R", &R);
+            transcript.append_point::<C>(b"L", &L);
+            transcript.append_point::<C>(b"R", &R);
 
-            let u = transcript.challenge_scalar(b"u");
+            let u: C::Scalar = transcript.challenge_scalar::<C>(b"u");
             let u_inv = u.invert().unwrap();
 
             for i in 0..n {
                 a_L[i] = a_L[i] * u + u_inv * a_R[i];
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
-                G_L[i] = G1Projective::sum_of_products(
+                G_L[i] = C::pippenger_sum_of_products(
                     &[G_L[i], G_R[i]],
                     &[u_inv * G_factors[i], u * G_factors[n + i]],
                 );
-                H_L[i] = G1Projective::sum_of_products(
+                H_L[i] = C::pippenger_sum_of_products(
                     &[H_L[i], H_R[i]],
                     &[u * H_factors[i], u_inv * H_factors[n + i]],
                 );
@@ -159,51 +158,51 @@ impl InnerProductProof {
             let (G_L, G_R) = G.split_at_mut(n);
             let (H_L, H_R) = H.split_at_mut(n);
 
-            let c_L = inner_product(a_L, b_R);
-            let c_R = inner_product(a_R, b_L);
+            let c_L = inner_product::<C>(a_L, b_R);
+            let c_R = inner_product::<C>(a_R, b_L);
 
-            let L_points: Vec<G1Projective> = G_R
+            let L_points: Vec<C::Point> = G_R
                 .iter()
                 .copied()
                 .chain(H_L.iter().copied())
                 .chain(iter::once(*Q))
                 .collect();
-            let L_scalars: Vec<Scalar> = a_L
+            let L_scalars: Vec<C::Scalar> = a_L
                 .iter()
                 .copied()
                 .chain(b_R.iter().copied())
                 .chain(iter::once(c_L))
                 .collect();
-            let L = G1Projective::sum_of_products(&L_points, &L_scalars);
+            let L = C::pippenger_sum_of_products(&L_points, &L_scalars);
 
-            let R_points: Vec<G1Projective> = G_L
+            let R_points: Vec<C::Point> = G_L
                 .iter()
                 .copied()
                 .chain(H_R.iter().copied())
                 .chain(iter::once(*Q))
                 .collect();
-            let R_scalars: Vec<Scalar> = a_R
+            let R_scalars: Vec<C::Scalar> = a_R
                 .iter()
                 .copied()
                 .chain(b_L.iter().copied())
                 .chain(iter::once(c_R))
                 .collect();
-            let R = G1Projective::sum_of_products(&R_points, &R_scalars);
+            let R = C::pippenger_sum_of_products(&R_points, &R_scalars);
 
             L_vec.push(L);
             R_vec.push(R);
 
-            transcript.append_point(b"L", &L);
-            transcript.append_point(b"R", &R);
+            transcript.append_point::<C>(b"L", &L);
+            transcript.append_point::<C>(b"R", &R);
 
-            let u = transcript.challenge_scalar(b"u");
+            let u: C::Scalar = transcript.challenge_scalar::<C>(b"u");
             let u_inv = u.invert().unwrap();
 
             for i in 0..n {
                 a_L[i] = a_L[i] * u + u_inv * a_R[i];
                 b_L[i] = b_L[i] * u_inv + u * b_R[i];
-                G_L[i] = G1Projective::sum_of_products(&[G_L[i], G_R[i]], &[u_inv, u]);
-                H_L[i] = G1Projective::sum_of_products(&[H_L[i], H_R[i]], &[u, u_inv]);
+                G_L[i] = C::pippenger_sum_of_products(&[G_L[i], G_R[i]], &[u_inv, u]);
+                H_L[i] = C::pippenger_sum_of_products(&[H_L[i], H_R[i]], &[u, u_inv]);
             }
 
             a = a_L;
@@ -227,7 +226,7 @@ impl InnerProductProof {
         &self,
         n: usize,
         transcript: &mut Transcript,
-    ) -> Result<(Vec<Scalar>, Vec<Scalar>, Vec<Scalar>), ProofError> {
+    ) -> Result<(Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>), ProofError> {
         let lg_n = self.L_vec.len();
         if lg_n >= 32 {
             // 4 billion multiplications should be enough for anyone
@@ -244,15 +243,15 @@ impl InnerProductProof {
 
         let mut challenges = Vec::with_capacity(lg_n);
         for (L, R) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            transcript.validate_and_append_point(b"L", L)?;
-            transcript.validate_and_append_point(b"R", R)?;
-            challenges.push(transcript.challenge_scalar(b"u"));
+            transcript.validate_and_append_point::<C>(b"L", L)?;
+            transcript.validate_and_append_point::<C>(b"R", R)?;
+            challenges.push(transcript.challenge_scalar::<C>(b"u"));
         }
 
         // 2. Compute 1/(u_k...u_1) and 1/u_k, ..., 1/u_1
 
         let mut challenges_inv = challenges.clone();
-        let allinv = Scalar::batch_invert(&mut challenges_inv);
+        let allinv = C::Scalar::batch_invert(&mut challenges_inv);
 
         // 3. Compute u_i^2 and (1/u_i)^2
 
@@ -291,16 +290,16 @@ impl InnerProductProof {
         transcript: &mut Transcript,
         G_factors: IG,
         H_factors: IH,
-        P: &G1Projective,
-        Q: &G1Projective,
-        G: &[G1Projective],
-        H: &[G1Projective],
+        P: &C::Point,
+        Q: &C::Point,
+        G: &[C::Point],
+        H: &[C::Point],
     ) -> Result<(), ProofError>
     where
         IG: IntoIterator,
-        IG::Item: Borrow<Scalar>,
+        IG::Item: Borrow<C::Scalar>,
         IH: IntoIterator,
-        IH::Item: Borrow<Scalar>,
+        IH::Item: Borrow<C::Scalar>,
     {
         let (u_sq, u_inv_sq, s) = self.verification_scalars(n, transcript)?;
 
@@ -318,22 +317,22 @@ impl InnerProductProof {
             .zip(inv_s)
             .map(|(h_i, s_i_inv)| (self.b * s_i_inv) * h_i.borrow());
 
-        let neg_u_sq = u_sq.iter().map(|ui| -ui);
-        let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -ui);
+        let neg_u_sq = u_sq.iter().map(|ui| -*ui);
+        let neg_u_inv_sq = u_inv_sq.iter().map(|ui| -*ui);
 
-        let P_points: Vec<G1Projective> = iter::once(*Q)
+        let P_points: Vec<C::Point> = iter::once(*Q)
             .chain(G.iter().copied())
             .chain(H.iter().copied())
             .chain(self.L_vec.iter().copied())
             .chain(self.R_vec.iter().copied())
             .collect();
-        let P_scalars: Vec<Scalar> = iter::once(self.a * self.b)
+        let P_scalars: Vec<C::Scalar> = iter::once(self.a * self.b)
             .chain(g_times_a_times_s)
             .chain(h_times_b_div_s)
             .chain(neg_u_sq)
             .chain(neg_u_inv_sq)
             .collect();
-        let expect_P = G1Projective::sum_of_products(&P_points, &P_scalars);
+        let expect_P = C::pippenger_sum_of_products(P_points.as_slice(), P_scalars.as_slice());
 
         expect_P.ct_eq(P).ok_or(ProofError::VerificationError)
     }
@@ -342,22 +341,22 @@ impl InnerProductProof {
     /// product proof.
     ///
     /// For vectors of length `n` the proof size is
-    /// \\(48 \cdot (2\lg n+2)\\) bytes.
+    /// \\(POINT_BYTES \cdot (2\lg n+2)\\) bytes.
     pub fn serialized_size(&self) -> usize {
-        (self.L_vec.len() * 2) * 48 + 2 * 32
+        (self.L_vec.len() * 2) * C::POINT_BYTES + 2 * C::SCALAR_BYTES
     }
 
-    /// Serializes the proof into a byte array of \\(2n+2\\) 48-byte elements.
+    /// Serializes the proof into a byte array of \\(2n+2\\) POINT_SIZE-byte elements.
     /// The layout of the inner product proof is:
-    /// * \\(n\\) pairs of compressed G1Projective points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
+    /// * \\(n\\) pairs of compressed Projective points \\(L_0, R_0 \dots, L_{n-1}, R_{n-1}\\),
     /// * two scalars \\(a, b\\).
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::with_capacity(self.serialized_size());
-        buf.extend_from_slice(&self.a.to_bytes());
-        buf.extend_from_slice(&self.b.to_bytes());
+        buf.append(&mut C::serialize_scalar(&self.a));
+        buf.append(&mut C::serialize_scalar(&self.b));
         for (l, r) in self.L_vec.iter().zip(self.R_vec.iter()) {
-            buf.extend_from_slice(&l.to_affine().to_compressed());
-            buf.extend_from_slice(&r.to_affine().to_compressed());
+            buf.append(&mut C::serialize_point(&l));
+            buf.append(&mut C::serialize_point(&r));
         }
         buf
     }
@@ -368,12 +367,12 @@ impl InnerProductProof {
     /// * \\(n\\) is larger or equal to 32 (proof is too big),
     /// * any of \\(2n\\) points are not valid compressed G1Projective points,
     /// * any of 2 scalars are not canonical scalars modulo G1Projective group order.
-    pub fn from_bytes(slice: &[u8]) -> Result<InnerProductProof, ProofError> {
-        let b = slice.len() - 64;
-        if b % 48 != 0 {
+    pub fn from_bytes(slice: &[u8]) -> Result<Self, ProofError> {
+        let b = slice.len() - C::SCALAR_BYTES * 2;
+        if b % C::POINT_BYTES != 0 {
             return Err(ProofError::FormatError);
         }
-        let num_elements = b / 48 + 2;
+        let num_elements = b / C::POINT_BYTES + 2;
         if num_elements < 2 {
             return Err(ProofError::FormatError);
         }
@@ -381,29 +380,25 @@ impl InnerProductProof {
             return Err(ProofError::FormatError);
         }
         let lg_n = (num_elements - 2) / 2;
-        if lg_n >= 48 {
+        if lg_n >= C::POINT_BYTES {
             return Err(ProofError::FormatError);
         }
 
-        use crate::util::{read32, read48};
+        let a = C::deserialize_scalar(&slice[..C::SCALAR_BYTES])
+            .map_err(|_| ProofError::FormatError)?;
+        let b = C::deserialize_scalar(&slice[C::SCALAR_BYTES..C::SCALAR_BYTES * 2])
+            .map_err(|_| ProofError::FormatError)?;
 
-        let a = Scalar::from_bytes(&read32(slice)).ok_or(ProofError::FormatError)?;
-        let b = Scalar::from_bytes(&read32(&slice[32..])).ok_or(ProofError::FormatError)?;
-
-        let mut L_vec: Vec<G1Projective> = Vec::with_capacity(lg_n);
-        let mut R_vec: Vec<G1Projective> = Vec::with_capacity(lg_n);
+        let mut L_vec: Vec<C::Point> = Vec::with_capacity(lg_n);
+        let mut R_vec: Vec<C::Point> = Vec::with_capacity(lg_n);
         for i in 0..lg_n {
-            let pos = 64 + i * 96;
-            L_vec.push(
-                G1Affine::from_compressed(&read48(&slice[pos..]))
-                    .map(G1Projective::from)
-                    .unwrap(),
-            );
-            R_vec.push(
-                G1Affine::from_compressed(&read48(&slice[pos + 48..]))
-                    .map(G1Projective::from)
-                    .unwrap(),
-            );
+            let pos = C::SCALAR_BYTES * 2 + i * (C::POINT_BYTES * 2);
+            let l = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
+                .map_err(|_| ProofError::FormatError)?;
+            let r = C::deserialize_point(&slice[pos + C::POINT_BYTES..pos + C::POINT_BYTES * 2])
+                .map_err(|_| ProofError::FormatError)?;
+            L_vec.push(l);
+            R_vec.push(r);
         }
 
         Ok(InnerProductProof { L_vec, R_vec, a, b })
@@ -415,8 +410,8 @@ impl InnerProductProof {
 ///    {\langle {\mathbf{a}}, {\mathbf{b}} \rangle} = \sum\_{i=0}^{n-1} a\_i \cdot b\_i.
 /// \\]
 /// Panics if the lengths of \\(\mathbf{a}\\) and \\(\mathbf{b}\\) are not equal.
-pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
-    let mut out = Scalar::ZERO;
+pub fn inner_product<C: BulletproofCurveArithmetic>(a: &[C::Scalar], b: &[C::Scalar]) -> C::Scalar {
+    let mut out = C::Scalar::ZERO;
     if a.len() != b.len() {
         panic!("inner_product(a,b): lengths of vectors do not match");
     }
@@ -429,55 +424,52 @@ pub fn inner_product(a: &[Scalar], b: &[Scalar]) -> Scalar {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::HASH_DST;
-    use bls12_381_plus::ExpandMsgXof;
 
     use crate::util;
     use group::ff::Field;
-    use sha3::Shake256;
 
-    fn test_helper_create(n: usize) {
+    fn test_helper_create<C: BulletproofCurveArithmetic>(n: usize) {
         let mut rng = rand::thread_rng();
 
         use crate::generators::BulletproofGens;
-        let bp_gens = BulletproofGens::new(n, 1);
-        let G: Vec<G1Projective> = bp_gens.share(0).G(n).cloned().collect();
-        let H: Vec<G1Projective> = bp_gens.share(0).H(n).cloned().collect();
+        let bp_gens = BulletproofGens::<C>::new(n, 1);
+        let G: Vec<C::Point> = bp_gens.share(0).G(n).cloned().collect();
+        let H: Vec<C::Point> = bp_gens.share(0).H(n).cloned().collect();
 
         // Q would be determined upstream in the protocol, so we pick a random one.
-        let Q = G1Projective::hash::<ExpandMsgXof<Shake256>>(b"test point", HASH_DST);
+        let Q = C::Point::hash_to_point(b"test point");
 
         // a and b are the vectors for which we want to prove c = <a,b>
-        let a: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let b: Vec<_> = (0..n).map(|_| Scalar::random(&mut rng)).collect();
-        let c = inner_product(&a, &b);
+        let a: Vec<_> = (0..n).map(|_| C::Scalar::random(&mut rng)).collect();
+        let b: Vec<_> = (0..n).map(|_| C::Scalar::random(&mut rng)).collect();
+        let c = inner_product::<C>(&a, &b);
 
-        let G_factors: Vec<Scalar> = iter::repeat(Scalar::ONE).take(n).collect();
+        let G_factors: Vec<C::Scalar> = iter::repeat(C::Scalar::ONE).take(n).collect();
 
         // y_inv is (the inverse of) a random challenge
-        let y_inv = Scalar::random(&mut rng);
-        let H_factors: Vec<Scalar> = util::exp_iter(y_inv).take(n).collect();
+        let y_inv = C::Scalar::random(&mut rng);
+        let H_factors: Vec<C::Scalar> = util::exp_iter::<C>(y_inv).take(n).collect();
 
         // P would be determined upstream, but we need a correct P to check the proof.
         //
         // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
         //             P = <a,G> + <b',H> + <a,b> Q,
         // where b' = b \circ y^(-n)
-        let b_prime = b.iter().zip(util::exp_iter(y_inv)).map(|(bi, yi)| bi * yi);
+        let b_prime = b.iter().zip(util::exp_iter::<C>(y_inv)).map(|(bi, yi)| *bi * yi);
         // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
         let a_prime = a.iter().cloned();
 
-        let P_points: Vec<G1Projective> = G
+        let P_points: Vec<C::Point> = G
             .iter()
             .map(|&p| p)
             .chain(H.iter().map(|&p| p))
             .chain(iter::once(Q))
             .collect();
-        let P_scalars: Vec<Scalar> = a_prime.chain(b_prime).chain(iter::once(c)).collect();
-        let P = G1Projective::sum_of_products(&P_points, &P_scalars);
+        let P_scalars: Vec<C::Scalar> = a_prime.chain(b_prime).chain(iter::once(c)).collect();
+        let P = C::pippenger_sum_of_products(&P_points, &P_scalars);
 
         let mut verifier = Transcript::new(b"innerproducttest");
-        let proof = InnerProductProof::create(
+        let proof = InnerProductProof::<C>::create(
             &mut verifier,
             &Q,
             &G_factors,
@@ -490,10 +482,10 @@ mod tests {
 
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(proof
-            .verify(
+            .verify::<iter::Take<iter::Repeat<C::Scalar>>, iter::Take<util::ScalarExp<C>>>(
                 n,
                 &mut verifier,
-                iter::repeat(Scalar::ONE).take(n),
+                iter::repeat(C::Scalar::ONE).take(n),
                 util::exp_iter(y_inv).take(n),
                 &P,
                 &Q,
@@ -502,13 +494,13 @@ mod tests {
             )
             .is_ok());
 
-        let proof = InnerProductProof::from_bytes(proof.to_bytes().as_slice()).unwrap();
+        let proof = InnerProductProof::<C>::from_bytes(proof.to_bytes().as_slice()).unwrap();
         let mut verifier = Transcript::new(b"innerproducttest");
         assert!(proof
-            .verify(
+            .verify::<iter::Take<iter::Repeat<C::Scalar>>, iter::Take<util::ScalarExp<C>>>(
                 n,
                 &mut verifier,
-                iter::repeat(Scalar::ONE).take(n),
+                iter::repeat(C::Scalar::ONE).take(n),
                 util::exp_iter(y_inv).take(n),
                 &P,
                 &Q,
@@ -520,43 +512,117 @@ mod tests {
 
     #[test]
     fn make_ipp_1() {
-        test_helper_create(1);
+        #[cfg(feature = "curve25519")]
+        test_helper_create::<crate::Curve25519>(1);
+        #[cfg(feature = "k256")]
+        test_helper_create::<k256::Secp256k1>(1);
+        #[cfg(feature = "p256")]
+        test_helper_create::<p256::NistP256>(1);
+        #[cfg(feature = "bls12_381")]
+        test_helper_create::<bls12_381_plus::Bls12381G1>(1);
+        #[cfg(feature = "bls12_381_std")]
+        test_helper_create::<blstrs_plus::Bls12381G1>(1);
     }
 
     #[test]
     fn make_ipp_2() {
-        test_helper_create(2);
+        #[cfg(feature = "curve25519")]
+        test_helper_create::<crate::Curve25519>(2);
+        #[cfg(feature = "k256")]
+        test_helper_create::<k256::Secp256k1>(2);
+        #[cfg(feature = "p256")]
+        test_helper_create::<p256::NistP256>(2);
+        #[cfg(feature = "bls12_381")]
+        test_helper_create::<bls12_381_plus::Bls12381G1>(2);
+        #[cfg(feature = "bls12_381_std")]
+        test_helper_create::<blstrs_plus::Bls12381G1>(2);
     }
 
     #[test]
     fn make_ipp_4() {
-        test_helper_create(4);
+        #[cfg(feature = "curve25519")]
+        test_helper_create::<crate::Curve25519>(4);
+        #[cfg(feature = "k256")]
+        test_helper_create::<k256::Secp256k1>(4);
+        #[cfg(feature = "p256")]
+        test_helper_create::<p256::NistP256>(4);
+        #[cfg(feature = "bls12_381")]
+        test_helper_create::<bls12_381_plus::Bls12381G1>(4);
+        #[cfg(feature = "bls12_381_std")]
+        test_helper_create::<blstrs_plus::Bls12381G1>(4);
     }
 
     #[test]
     fn make_ipp_32() {
-        test_helper_create(32);
+        #[cfg(feature = "curve25519")]
+        test_helper_create::<crate::Curve25519>(32);
+        #[cfg(feature = "k256")]
+        test_helper_create::<k256::Secp256k1>(32);
+        #[cfg(feature = "p256")]
+        test_helper_create::<p256::NistP256>(32);
+        #[cfg(feature = "bls12_381")]
+        test_helper_create::<bls12_381_plus::Bls12381G1>(32);
+        #[cfg(feature = "bls12_381_std")]
+        test_helper_create::<blstrs_plus::Bls12381G1>(32);
     }
 
     #[test]
     fn make_ipp_64() {
-        test_helper_create(64);
+        #[cfg(feature = "curve25519")]
+        test_helper_create::<crate::Curve25519>(64);
+        #[cfg(feature = "k256")]
+        test_helper_create::<k256::Secp256k1>(64);
+        #[cfg(feature = "p256")]
+        test_helper_create::<p256::NistP256>(64);
+        #[cfg(feature = "bls12_381")]
+        test_helper_create::<bls12_381_plus::Bls12381G1>(64);
+        #[cfg(feature = "bls12_381_std")]
+        test_helper_create::<blstrs_plus::Bls12381G1>(64);
     }
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn test_inner_product() {
+    fn test_inner_product_curve25519() {
+        test_inner_product::<crate::Curve25519>();
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn test_inner_product_k256() {
+        test_inner_product::<k256::Secp256k1>();
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn test_inner_product_p256() {
+        test_inner_product::<p256::NistP256>();
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn test_inner_product_bls12_381() {
+        test_inner_product::<bls12_381_plus::Bls12381G1>();
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn test_inner_product_bls12_381_std() {
+        test_inner_product::<blstrs_plus::Bls12381G1>();
+    }
+
+    fn test_inner_product<C: BulletproofCurveArithmetic>() {
         let a = vec![
-            Scalar::from(1u64),
-            Scalar::from(2u64),
-            Scalar::from(3u64),
-            Scalar::from(4u64),
+            C::Scalar::from(1u64),
+            C::Scalar::from(2u64),
+            C::Scalar::from(3u64),
+            C::Scalar::from(4u64),
         ];
         let b = vec![
-            Scalar::from(2u64),
-            Scalar::from(3u64),
-            Scalar::from(4u64),
-            Scalar::from(5u64),
+            C::Scalar::from(2u64),
+            C::Scalar::from(3u64),
+            C::Scalar::from(4u64),
+            C::Scalar::from(5u64),
         ];
-        assert_eq!(Scalar::from(40u64), inner_product(&a, &b));
+        assert_eq!(C::Scalar::from(40u64), inner_product::<C>(&a, &b));
     }
 }

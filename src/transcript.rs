@@ -1,7 +1,7 @@
 //! Defines a `TranscriptProtocol` trait for using a Merlin transcript.
 
-use bls12_381_plus::{G1Projective, Scalar};
-use group::Curve;
+use crate::types::{BulletproofCurveArithmetic, FromWideBytes};
+use group::Group;
 use merlin::Transcript;
 
 use crate::errors::ProofError;
@@ -23,21 +23,32 @@ pub trait TranscriptProtocol {
     fn r1cs_2phase_domain_sep(&mut self);
 
     /// Append a `scalar` with the given `label`.
-    fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar);
+    fn append_scalar<C: BulletproofCurveArithmetic>(
+        &mut self,
+        label: &'static [u8],
+        scalar: &C::Scalar,
+    );
 
     /// Append a `point` with the given `label`.
-    fn append_point(&mut self, label: &'static [u8], point: &G1Projective);
+    fn append_point<C: BulletproofCurveArithmetic>(
+        &mut self,
+        label: &'static [u8],
+        point: &C::Point,
+    );
 
     /// Check that a point is not the identity, then append it to the
     /// transcript.  Otherwise, return an error.
-    fn validate_and_append_point(
+    fn validate_and_append_point<C: BulletproofCurveArithmetic>(
         &mut self,
         label: &'static [u8],
-        point: &G1Projective,
+        point: &C::Point,
     ) -> Result<(), ProofError>;
 
     /// Compute a `label`ed challenge variable.
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar;
+    fn challenge_scalar<C: BulletproofCurveArithmetic>(
+        &mut self,
+        label: &'static [u8],
+    ) -> C::Scalar;
 }
 
 impl TranscriptProtocol for Transcript {
@@ -64,31 +75,42 @@ impl TranscriptProtocol for Transcript {
         self.append_message(b"dom-sep", b"r1cs-2phase");
     }
 
-    fn append_scalar(&mut self, label: &'static [u8], scalar: &Scalar) {
-        self.append_message(label, &scalar.to_bytes());
-    }
-
-    fn append_point(&mut self, label: &'static [u8], point: &G1Projective) {
-        self.append_message(label, &point.to_affine().to_compressed());
-    }
-
-    fn validate_and_append_point(
+    fn append_scalar<C: BulletproofCurveArithmetic>(
         &mut self,
         label: &'static [u8],
-        point: &G1Projective,
+        scalar: &C::Scalar,
+    ) {
+        self.append_message(label, &C::serialize_scalar(scalar));
+    }
+
+    fn append_point<C: BulletproofCurveArithmetic>(
+        &mut self,
+        label: &'static [u8],
+        point: &C::Point,
+    ) {
+        self.append_message(label, &C::serialize_point(point));
+    }
+
+    fn validate_and_append_point<C: BulletproofCurveArithmetic>(
+        &mut self,
+        label: &'static [u8],
+        point: &C::Point,
     ) -> Result<(), ProofError> {
         if point.is_identity().unwrap_u8() == 1u8 {
             Err(ProofError::VerificationError)
         } else {
-            self.append_message(label, &point.to_affine().to_compressed());
+            self.append_message(label, &C::serialize_point(point));
             Ok(())
         }
     }
 
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
+    fn challenge_scalar<C: BulletproofCurveArithmetic>(
+        &mut self,
+        label: &'static [u8],
+    ) -> C::Scalar {
         let mut buf = [0u8; 64];
         self.challenge_bytes(label, &mut buf);
 
-        Scalar::from_bytes_wide(&buf)
+        C::Scalar::from_wide_bytes(&buf)
     }
 }

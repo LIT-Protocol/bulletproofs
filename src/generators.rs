@@ -6,12 +6,12 @@
 
 extern crate alloc;
 
-use super::HASH_DST;
 use alloc::vec::Vec;
-use bls12_381_plus::{ExpandMsgXof, G1Projective, Scalar};
-use digest::{ExtendableOutputDirty, Update, XofReader};
-use group::Curve;
-use sha3::{Sha3XofReader, Shake256};
+use digest::{ExtendableOutput, Update, XofReader};
+use group::{Group, GroupEncoding};
+use sha3::{Shake256, Shake256Reader};
+
+use crate::types::*;
 
 /// Represents a pair of base points for Pedersen commitments.
 ///
@@ -25,28 +25,25 @@ use sha3::{Sha3XofReader, Shake256};
 /// * `B_blinding`: the result of G1 SHAKE-256
 /// hash-to-group on input `B_bytes`.
 #[derive(Copy, Clone)]
-pub struct PedersenGens {
+pub struct PedersenGens<C: BulletproofCurveArithmetic> {
     /// Base for the committed value
-    pub B: G1Projective,
+    pub B: C::Point,
     /// Base for the blinding factor
-    pub B_blinding: G1Projective,
+    pub B_blinding: C::Point,
 }
 
-impl PedersenGens {
+impl<C: BulletproofCurveArithmetic> PedersenGens<C> {
     /// Creates a Pedersen commitment using the value scalar and a blinding factor.
-    pub fn commit(&self, value: Scalar, blinding: Scalar) -> G1Projective {
-        G1Projective::sum_of_products(&[self.B, self.B_blinding], &[value, blinding])
+    pub fn commit(&self, value: C::Scalar, blinding: C::Scalar) -> C::Point {
+        C::pippenger_sum_of_products(&[self.B, self.B_blinding], &[value, blinding])
     }
 }
 
-impl Default for PedersenGens {
+impl<C: BulletproofCurveArithmetic> Default for PedersenGens<C> {
     fn default() -> Self {
         PedersenGens {
-            B: G1Projective::GENERATOR,
-            B_blinding: G1Projective::hash::<ExpandMsgXof<Shake256>>(
-                &G1Projective::GENERATOR.to_affine().to_compressed(),
-                HASH_DST,
-            ),
+            B: C::Point::generator(),
+            B_blinding: C::Point::hash_to_point(C::Point::generator().to_bytes().as_ref()),
         }
     }
 }
@@ -54,11 +51,12 @@ impl Default for PedersenGens {
 /// The `GeneratorsChain` creates an arbitrary-long sequence of
 /// orthogonal generators.  The sequence can be deterministically
 /// produced starting with an arbitrary point.
-struct GeneratorsChain {
-    reader: Sha3XofReader,
+struct GeneratorsChain<C: BulletproofCurveArithmetic> {
+    reader: Shake256Reader,
+    _marker: core::marker::PhantomData<C>,
 }
 
-impl GeneratorsChain {
+impl<C: BulletproofCurveArithmetic> GeneratorsChain<C> {
     /// Creates a chain of generators, determined by the hash of `label`.
     fn new(label: &[u8]) -> Self {
         let mut shake = Shake256::default();
@@ -66,7 +64,8 @@ impl GeneratorsChain {
         shake.update(label);
 
         GeneratorsChain {
-            reader: shake.finalize_xof_dirty(),
+            reader: shake.finalize_xof(),
+            _marker: core::marker::PhantomData,
         }
     }
 
@@ -81,27 +80,24 @@ impl GeneratorsChain {
     }
 }
 
-impl Default for GeneratorsChain {
+impl<C: BulletproofCurveArithmetic> Default for GeneratorsChain<C> {
     fn default() -> Self {
         Self::new(&[])
     }
 }
 
-impl Iterator for GeneratorsChain {
-    type Item = G1Projective;
+impl<C: BulletproofCurveArithmetic> Iterator for GeneratorsChain<C> {
+    type Item = C::Point;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut uniform_bytes = [0u8; 64];
         self.reader.read(&mut uniform_bytes);
 
-        Some(G1Projective::hash::<ExpandMsgXof<Shake256>>(
-            &uniform_bytes,
-            HASH_DST,
-        ))
+        Some(C::Point::hash_to_point(&uniform_bytes))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (usize::max_value(), None)
+        (usize::MAX, None)
     }
 }
 
@@ -132,18 +128,18 @@ impl Iterator for GeneratorsChain {
 /// constraint system proofs, since the generators are namespaced by
 /// their party index.
 #[derive(Clone)]
-pub struct BulletproofGens {
+pub struct BulletproofGens<C: BulletproofCurveArithmetic> {
     /// The maximum number of usable generators for each party.
     pub gens_capacity: usize,
     /// Number of values or parties
     pub party_capacity: usize,
     /// Precomputed \\(\mathbf G\\) generators for each party.
-    G_vec: Vec<Vec<G1Projective>>,
+    G_vec: Vec<Vec<C::Point>>,
     /// Precomputed \\(\mathbf H\\) generators for each party.
-    H_vec: Vec<Vec<G1Projective>>,
+    H_vec: Vec<Vec<C::Point>>,
 }
 
-impl BulletproofGens {
+impl<C: BulletproofCurveArithmetic> BulletproofGens<C> {
     /// Create a new `BulletproofGens` object.
     ///
     /// # Inputs
@@ -169,7 +165,7 @@ impl BulletproofGens {
 
     /// Returns j-th share of generators, with an appropriate
     /// slice of vectors G and H for the j-th range proof.
-    pub fn share(&self, j: usize) -> BulletproofGensShare<'_> {
+    pub fn share(&self, j: usize) -> BulletproofGensShare<'_, C> {
         BulletproofGensShare {
             gens: self,
             share: j,
@@ -190,14 +186,14 @@ impl BulletproofGens {
             let mut label = [b'G', 0, 0, 0, 0];
             LittleEndian::write_u32(&mut label[1..5], party_index);
             self.G_vec[i].extend(
-                &mut GeneratorsChain::new(&label)
+                &mut GeneratorsChain::<C>::new(&label)
                     .fast_forward(self.gens_capacity)
                     .take(new_capacity - self.gens_capacity),
             );
 
             label[0] = b'H';
             self.H_vec[i].extend(
-                &mut GeneratorsChain::new(&label)
+                &mut GeneratorsChain::<C>::new(&label)
                     .fast_forward(self.gens_capacity)
                     .take(new_capacity - self.gens_capacity),
             );
@@ -206,8 +202,8 @@ impl BulletproofGens {
     }
 
     /// Return an iterator over the aggregation of the parties' G generators with given size `n`.
-    pub(crate) fn G(&self, n: usize, m: usize) -> impl Iterator<Item = &G1Projective> {
-        AggregatedGensIter {
+    pub(crate) fn G(&self, n: usize, m: usize) -> impl Iterator<Item = &C::Point> {
+        AggregatedGensIter::<C> {
             n,
             m,
             array: &self.G_vec,
@@ -217,8 +213,8 @@ impl BulletproofGens {
     }
 
     /// Return an iterator over the aggregation of the parties' H generators with given size `n`.
-    pub(crate) fn H(&self, n: usize, m: usize) -> impl Iterator<Item = &G1Projective> {
-        AggregatedGensIter {
+    pub(crate) fn H(&self, n: usize, m: usize) -> impl Iterator<Item = &C::Point> {
+        AggregatedGensIter::<C> {
             n,
             m,
             array: &self.H_vec,
@@ -228,16 +224,16 @@ impl BulletproofGens {
     }
 }
 
-struct AggregatedGensIter<'a> {
-    array: &'a Vec<Vec<G1Projective>>,
+struct AggregatedGensIter<'a, C: BulletproofCurveArithmetic> {
+    array: &'a Vec<Vec<C::Point>>,
     n: usize,
     m: usize,
     party_idx: usize,
     gen_idx: usize,
 }
 
-impl<'a> Iterator for AggregatedGensIter<'a> {
-    type Item = &'a G1Projective;
+impl<'a, C: BulletproofCurveArithmetic> Iterator for AggregatedGensIter<'a, C> {
+    type Item = &'a C::Point;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.gen_idx >= self.n {
@@ -269,21 +265,21 @@ impl<'a> Iterator for AggregatedGensIter<'a> {
 ///
 /// The `BulletproofGensShare` is produced by [`BulletproofGens::share()`].
 #[derive(Copy, Clone)]
-pub struct BulletproofGensShare<'a> {
+pub struct BulletproofGensShare<'a, C: BulletproofCurveArithmetic> {
     /// The parent object that this is a view into
-    gens: &'a BulletproofGens,
+    gens: &'a BulletproofGens<C>,
     /// Which share we are
     share: usize,
 }
 
-impl<'a> BulletproofGensShare<'a> {
+impl<'a, C: BulletproofCurveArithmetic> BulletproofGensShare<'a, C> {
     /// Return an iterator over this party's G generators with given size `n`.
-    pub fn G(&self, n: usize) -> impl Iterator<Item = &'a G1Projective> {
+    pub fn G(&self, n: usize) -> impl Iterator<Item = &'a C::Point> {
         self.gens.G_vec[self.share].iter().take(n)
     }
 
     /// Return an iterator over this party's H generators with given size `n`.
-    pub(crate) fn H(&self, n: usize) -> impl Iterator<Item = &'a G1Projective> {
+    pub(crate) fn H(&self, n: usize) -> impl Iterator<Item = &'a C::Point> {
         self.gens.H_vec[self.share].iter().take(n)
     }
 }
@@ -292,13 +288,42 @@ impl<'a> BulletproofGensShare<'a> {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn aggregated_gens_iter_matches_flat_map() {
-        let gens = BulletproofGens::new(64, 8);
+    fn aggregated_gens_iter_matches_flat_map_curve25519() {
+        aggregated_gens_iter_matches_flat_map::<crate::Curve25519>();
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn aggregated_gens_iter_matches_flat_map_k256() {
+        aggregated_gens_iter_matches_flat_map::<k256::Secp256k1>();
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn aggregated_gens_iter_matches_flat_map_p256() {
+        aggregated_gens_iter_matches_flat_map::<p256::NistP256>();
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn aggregated_gens_iter_matches_flat_map_bls12_381() {
+        aggregated_gens_iter_matches_flat_map::<bls12_381_plus::Bls12381G1>();
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn aggregated_gens_iter_matches_flat_map_bls12_381_std() {
+        aggregated_gens_iter_matches_flat_map::<blstrs_plus::Bls12381G1>();
+    }
+
+    fn aggregated_gens_iter_matches_flat_map<C: BulletproofCurveArithmetic>() {
+        let gens = BulletproofGens::<C>::new(64, 8);
 
         let helper = |n: usize, m: usize| {
-            let agg_G: Vec<G1Projective> = gens.G(n, m).cloned().collect();
-            let flat_G: Vec<G1Projective> = gens
+            let agg_G: Vec<C::Point> = gens.G(n, m).cloned().collect();
+            let flat_G: Vec<C::Point> = gens
                 .G_vec
                 .iter()
                 .take(m)
@@ -306,8 +331,8 @@ mod tests {
                 .cloned()
                 .collect();
 
-            let agg_H: Vec<G1Projective> = gens.H(n, m).cloned().collect();
-            let flat_H: Vec<G1Projective> = gens
+            let agg_H: Vec<C::Point> = gens.H(n, m).cloned().collect();
+            let flat_H: Vec<C::Point> = gens
                 .H_vec
                 .iter()
                 .take(m)
@@ -333,19 +358,48 @@ mod tests {
         helper(16, 1);
     }
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn resizing_small_gens_matches_creating_bigger_gens() {
-        let gens = BulletproofGens::new(64, 8);
+    fn resizing_small_gens_matches_creating_bigger_gens_curve25519() {
+        resizing_small_gens_matches_creating_bigger_gens::<crate::Curve25519>();
+    }
 
-        let mut gen_resized = BulletproofGens::new(32, 8);
+    #[cfg(feature = "k256")]
+    #[test]
+    fn resizing_small_gens_matches_creating_bigger_gens_k256() {
+        resizing_small_gens_matches_creating_bigger_gens::<k256::Secp256k1>();
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn resizing_small_gens_matches_creating_bigger_gens_p256() {
+        resizing_small_gens_matches_creating_bigger_gens::<p256::NistP256>();
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn resizing_small_gens_matches_creating_bigger_gens_bls12_381() {
+        resizing_small_gens_matches_creating_bigger_gens::<bls12_381_plus::Bls12381G1>();
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn resizing_small_gens_matches_creating_bigger_gens_bls12_381_std() {
+        resizing_small_gens_matches_creating_bigger_gens::<blstrs_plus::Bls12381G1>();
+    }
+
+    fn resizing_small_gens_matches_creating_bigger_gens<C: BulletproofCurveArithmetic>() {
+        let gens = BulletproofGens::<C>::new(64, 8);
+
+        let mut gen_resized = BulletproofGens::<C>::new(32, 8);
         gen_resized.increase_capacity(64);
 
         let helper = |n: usize, m: usize| {
-            let gens_G: Vec<G1Projective> = gens.G(n, m).cloned().collect();
-            let gens_H: Vec<G1Projective> = gens.H(n, m).cloned().collect();
+            let gens_G: Vec<C::Point> = gens.G(n, m).cloned().collect();
+            let gens_H: Vec<C::Point> = gens.H(n, m).cloned().collect();
 
-            let resized_G: Vec<G1Projective> = gen_resized.G(n, m).cloned().collect();
-            let resized_H: Vec<G1Projective> = gen_resized.H(n, m).cloned().collect();
+            let resized_G: Vec<C::Point> = gen_resized.G(n, m).cloned().collect();
+            let resized_H: Vec<C::Point> = gen_resized.H(n, m).cloned().collect();
 
             assert_eq!(gens_G, resized_G);
             assert_eq!(gens_H, resized_H);

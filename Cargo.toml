@@ -8,34 +8,38 @@ version = "4.0.0"
 authors = ["Cathie Yun <cathieyun@gmail.com>", 
            "Henry de Valence <hdevalence@hdevalence.ca>",
            "Oleg Andreev <oleganza@gmail.com>",
-           "Michael Lodder <redmike7@gmail.com>",
+           "Michael Lodder <mike@litprotocol.com>",
 ]
 readme = "README.md"
 license = "MIT"
-repository = "https://github.com/zkcrypto/bulletproofs"
+repository = "https://github.com/LIT-protocol/bulletproofs"
 categories = ["cryptography"]
 keywords = ["cryptography", "crypto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs"
 edition = "2021"
 
 [dependencies]
-bls12_381_plus = "=0.5.5"
-group = "=0.12.1"
-# subtle = { package = "subtle-ng", version = "2.4", default-features = false }
-subtle = { version = "2.4", default-features = false }
-sha3 = { version = "0.9.1", default-features = false }
-digest = { version = "0.9.0", default-features = false }
+group = "0.13"
+bls12_381_plus = { version = "0.8.5", optional = true }
+blstrs_plus = { version = "0.8.5", optional = true }
+k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
+p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
+subtle = { version = "2.5", default-features = false }
+sha2 = { version = "0.10", default-features = false, optional = true }
+sha3 = { version = "0.10", default-features = false }
+digest = { version = "0.10", default-features = false }
 rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
 rand = { version = "0.8", default-features = false, optional = true }
 byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
 thiserror = { version = "1", optional = true }
 merlin = { version = "3", default-features = false }
+vsss-rs = { version = "3.2.0", features = ["curve25519"], optional = true }
 zeroize = "1"
 
 [dev-dependencies]
 hex = "0.4"
-criterion = "0.4"
+criterion = "0.5"
 bincode = "1"
 rand_chacha = "0.3"
 
@@ -45,6 +49,11 @@ yoloproofs = []
 std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
 nightly = ["subtle/nightly"]
 docs = ["nightly"]
+k256 = ["dep:k256", "dep:sha2"]
+p256 = ["dep:p256", "dep:sha2"]
+bls12_381 = ["dep:bls12_381_plus", "dep:sha2"]
+bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
+curve25519 = ["dep:vsss-rs"]
 
 
 [[test]]
