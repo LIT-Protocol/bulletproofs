@@ -92,6 +92,7 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     /// fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
     /// // independently of the Bulletproofs generators.
+    /// use bulletproofs::BulletproofCurveArithmetic;
     /// let pc_gens = PedersenGens::<Curve25519>::default();
     ///
     /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
@@ -102,7 +103,7 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     /// let secret_value = 1037578891u64;
     ///
     /// // The API takes a blinding factor for the commitment.
-    /// let blinding = Curve25519::Scalar::random(&mut thread_rng());
+    /// let blinding = <Curve25519 as BulletproofCurveArithmetic>::Scalar::random(&mut thread_rng());
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
@@ -177,25 +178,25 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     /// # Example
     /// ```
     /// use rand::thread_rng;
-    /// use bls12_381_plus::Scalar;
     /// use group::ff::Field;
     /// use merlin::Transcript;
-    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    /// use bulletproofs::{BulletproofGens, Curve25519, PedersenGens, RangeProof};
     ///
     /// # fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
     /// // independently of the Bulletproofs generators.
-    /// let pc_gens = PedersenGens::default();
+    /// use bulletproofs::BulletproofCurveArithmetic;
+    /// let pc_gens = PedersenGens::<Curve25519>::default();
     ///
     /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
     /// // and aggregation size up to 16.
-    /// let bp_gens = BulletproofGens::new(64, 16);
+    /// let bp_gens = BulletproofGens::<Curve25519>::new(64, 16);
     ///
     /// // Four secret values we want to prove lie in the range [0, 2^32)
     /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
     ///
     /// // The API takes blinding factors for the commitments.
-    /// let blindings: Vec<_> = (0..4).map(|_| Scalar::random(&mut thread_rng())).collect();
+    /// let blindings: Vec<_> = (0..4).map(|_| <Curve25519 as BulletproofCurveArithmetic>::Scalar::random(&mut thread_rng())).collect();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.

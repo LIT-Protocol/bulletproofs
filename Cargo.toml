@@ -46,7 +46,7 @@ sha2 = "0.10"
 vsss-rs = { version = "3.2.2", features = ["curve25519"] }
 
 [features]
-default = ["std", "p256"]
+default = ["std"]
 yoloproofs = []
 std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
 nightly = ["subtle/nightly"]
