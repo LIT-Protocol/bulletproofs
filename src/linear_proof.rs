@@ -9,10 +9,10 @@ use group::ff::Field;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
-use crate::types::*;
 use crate::errors::ProofError;
 use crate::inner_product_proof::inner_product;
 use crate::transcript::TranscriptProtocol;
+use crate::types::*;
 
 /// A linear proof, which is an "lightweight" version of a Bulletproofs inner-product proof
 /// Protocol: Section E.3 of [GHL'21](https://eprint.iacr.org/2021/1397.pdf)
@@ -229,7 +229,8 @@ impl<C: BulletproofCurveArithmetic> LinearProof<C> {
             .copied()
             .chain(self.R_vec.iter().copied())
             .collect();
-        let L_R_scalars: Vec<C::Scalar> = x_vec.iter().copied().chain(x_inv_vec.into_iter()).collect();
+        let L_R_scalars: Vec<C::Scalar> =
+            x_vec.iter().copied().chain(x_inv_vec.into_iter()).collect();
         let L_R_factors = C::pippenger_sum_of_products(&L_R_points, &L_R_scalars);
 
         // This is an optimized way to compute the base case G (G_0 in the paper):
@@ -397,7 +398,7 @@ impl<C: BulletproofCurveArithmetic> LinearProof<C> {
             .map_err(|_| ProofError::FormatError)?;
 
         let mut pos = C::SCALAR_BYTES * 2;
-        let S = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+        let S = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
             .map_err(|_| ProofError::FormatError)?;
         pos += C::POINT_BYTES;
 

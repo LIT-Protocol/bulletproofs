@@ -34,7 +34,7 @@ byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
 thiserror = { version = "1", optional = true }
 merlin = { version = "3", default-features = false }
-vsss-rs = { version = "3.2.0", features = ["curve25519"], optional = true }
+vsss-rs = { version = "3.2.2", features = ["curve25519"], optional = true }
 zeroize = "1"
 
 [dev-dependencies]
@@ -42,9 +42,11 @@ hex = "0.4"
 criterion = "0.5"
 bincode = "1"
 rand_chacha = "0.3"
+sha2 = "0.10"
+vsss-rs = { version = "3.2.2", features = ["curve25519"] }
 
 [features]
-default = ["std"]
+default = ["std", "p256"]
 yoloproofs = []
 std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
 nightly = ["subtle/nightly"]
@@ -53,7 +55,7 @@ k256 = ["dep:k256", "dep:sha2"]
 p256 = ["dep:p256", "dep:sha2"]
 bls12_381 = ["dep:bls12_381_plus", "dep:sha2"]
 bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
-curve25519 = ["dep:vsss-rs"]
+curve25519 = ["dep:vsss-rs", "dep:sha2"]
 
 
 [[test]]

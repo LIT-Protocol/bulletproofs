@@ -455,7 +455,10 @@ mod tests {
         // To generate P = <a,G> + <b,H'> + <a,b> Q, compute
         //             P = <a,G> + <b',H> + <a,b> Q,
         // where b' = b \circ y^(-n)
-        let b_prime = b.iter().zip(util::exp_iter::<C>(y_inv)).map(|(bi, yi)| *bi * yi);
+        let b_prime = b
+            .iter()
+            .zip(util::exp_iter::<C>(y_inv))
+            .map(|(bi, yi)| *bi * yi);
         // a.iter() has Item=&Scalar, need Item=Scalar to chain with b_prime
         let a_prime = a.iter().cloned();
 

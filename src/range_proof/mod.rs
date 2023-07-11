@@ -14,15 +14,15 @@ use alloc::vec::Vec;
 use core::iter;
 
 use group::ff::Field;
-use group::{Curve, Group};
+use group::Group;
 use merlin::Transcript;
 
 use crate::errors::ProofError;
 use crate::generators::{BulletproofGens, PedersenGens};
 use crate::inner_product_proof::InnerProductProof;
 use crate::transcript::TranscriptProtocol;
-use crate::util;
 use crate::types::*;
+use crate::util;
 
 use rand_core::{CryptoRng, RngCore};
 use serde::de::Visitor;
@@ -85,32 +85,31 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     /// # Example
     /// ```
     /// use rand::thread_rng;
-    /// use bls12_381_plus::Scalar;
     /// use group::ff::Field;
     /// use merlin::Transcript;
-    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof, Curve25519};
     ///
-    /// # fn main() {
+    /// fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
     /// // independently of the Bulletproofs generators.
-    /// let pc_gens = PedersenGens::default();
+    /// let pc_gens = PedersenGens::<Curve25519>::default();
     ///
     /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
     /// // and aggregation size up to 1.
-    /// let bp_gens = BulletproofGens::new(64, 1);
+    /// let bp_gens = BulletproofGens::<Curve25519>::new(64, 1);
     ///
     /// // A secret value we want to prove lies in the range [0, 2^32)
     /// let secret_value = 1037578891u64;
     ///
     /// // The API takes a blinding factor for the commitment.
-    /// let blinding = Scalar::random(&mut thread_rng());
+    /// let blinding = Curve25519::Scalar::random(&mut thread_rng());
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
     /// let mut prover_transcript = Transcript::new(b"doctest example");
     ///
     /// // Create a 32-bit rangeproof.
-    /// let (proof, committed_value) = RangeProof::prove_single(
+    /// let (proof, committed_value) = RangeProof::<Curve25519>::prove_single(
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut prover_transcript,
@@ -366,8 +365,8 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
         transcript.validate_and_append_point::<C>(b"A", &self.A)?;
         transcript.validate_and_append_point::<C>(b"S", &self.S)?;
 
-        let y = transcript.challenge_scalar::<C>(b"y");
-        let z = transcript.challenge_scalar::<C>(b"z");
+        let y: C::Scalar = transcript.challenge_scalar::<C>(b"y");
+        let z: C::Scalar = transcript.challenge_scalar::<C>(b"z");
         let zz = z * z;
         let minus_z = -z;
 
@@ -380,7 +379,7 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
         transcript.append_scalar::<C>(b"t_x_blinding", &self.t_x_blinding);
         transcript.append_scalar::<C>(b"e_blinding", &self.e_blinding);
 
-        let w = transcript.challenge_scalar::<C>(b"w");
+        let w: C::Scalar = transcript.challenge_scalar::<C>(b"w");
 
         // Challenge value for batching statements to be verified
         let c = C::Scalar::random(rng);
@@ -393,10 +392,11 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
 
         // Construct concat_z_and_2, an iterator of the values of
         // z^0 * \vec(2)^n || z^1 * \vec(2)^n || ... || z^(m-1) * \vec(2)^n
-        let powers_of_2: Vec<C::Scalar> = util::exp_iter::<C>(C::Scalar::from(2u64)).take(n).collect();
+        let powers_of_2: Vec<C::Scalar> =
+            util::exp_iter::<C>(C::Scalar::from(2u64)).take(n).collect();
         let concat_z_and_2: Vec<C::Scalar> = util::exp_iter::<C>(z)
             .take(m)
-            .flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| exp_2 * exp_z))
+            .flat_map(|exp_z| powers_of_2.iter().map(move |exp_2| *exp_2 * exp_z))
             .collect();
 
         let g = s.iter().map(|s_i| minus_z - a * s_i);
@@ -406,7 +406,8 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
             .map(|((s_i_inv, exp_y_inv), z_and_2)| z + exp_y_inv * (zz * z_and_2 - b * s_i_inv));
 
         let value_commitment_scalars = util::exp_iter::<C>(z).take(m).map(|z_exp| c * zz * z_exp);
-        let basepoint_scalar = w * (self.t_x - a * b) + c * (delta(n, m, &y, &z) - self.t_x);
+        let basepoint_scalar: C::Scalar =
+            w * (self.t_x - a * b) + c * (delta::<C>(n, m, &y, &z) - self.t_x);
 
         let mega_points: Vec<C::Point> = iter::once(self.A)
             .chain(iter::once(self.S))
@@ -474,7 +475,9 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     /// * two scalars \\(a, b\\).
     pub fn to_bytes(&self) -> Vec<u8> {
         // 7 elements: points A, S, T1, T2, scalars tx, tx_bl, e_bl.
-        let mut buf = Vec::with_capacity(4 * C::POINT_BYTES + 3 * C::SCALAR_BYTES + self.ipp_proof.serialized_size());
+        let mut buf = Vec::with_capacity(
+            4 * C::POINT_BYTES + 3 * C::SCALAR_BYTES + self.ipp_proof.serialized_size(),
+        );
         buf.append(&mut C::serialize_point(&self.A));
         buf.append(&mut C::serialize_point(&self.S));
         buf.append(&mut C::serialize_point(&self.T_1));
@@ -494,30 +497,30 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
             return Err(ProofError::FormatError);
         }
 
-        use crate::util::{read32, read48};
         let mut pos = 0;
 
-        let A = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+        let A = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
             .map_err(|_| ProofError::FormatError)?;
         pos += C::POINT_BYTES;
-        let S = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+        let S = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
             .map_err(|_| ProofError::FormatError)?;
         pos += C::POINT_BYTES;
-        let T_1 = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+        let T_1 = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
             .map_err(|_| ProofError::FormatError)?;
         pos += C::POINT_BYTES;
-        let T_2 = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+        let T_2 = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
             .map_err(|_| ProofError::FormatError)?;
+        pos += C::POINT_BYTES;
 
-        let mut pos = 48 * 4;
-        let t_x = Scalar::from_bytes(&read32(&slice[pos..])).ok_or(ProofError::FormatError)?;
-        pos += 32;
-        let t_x_blinding =
-            Scalar::from_bytes(&read32(&slice[pos..])).ok_or(ProofError::FormatError)?;
-        pos += 32;
-        let e_blinding =
-            Scalar::from_bytes(&read32(&slice[pos..])).ok_or(ProofError::FormatError)?;
-        pos += 32;
+        let t_x = C::deserialize_scalar(&slice[pos..pos + C::SCALAR_BYTES])
+            .map_err(|_| ProofError::FormatError)?;
+        pos += C::SCALAR_BYTES;
+        let t_x_blinding = C::deserialize_scalar(&slice[pos..pos + C::SCALAR_BYTES])
+            .map_err(|_| ProofError::FormatError)?;
+        pos += C::SCALAR_BYTES;
+        let e_blinding = C::deserialize_scalar(&slice[pos..pos + C::SCALAR_BYTES])
+            .map_err(|_| ProofError::FormatError)?;
+        pos += C::SCALAR_BYTES;
 
         let ipp_proof = InnerProductProof::from_bytes(&slice[pos..])?;
 
@@ -550,7 +553,7 @@ impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for RangeProof<C> {
     {
         struct RangeProofVisitor<C: BulletproofCurveArithmetic> {
             _marker: core::marker::PhantomData<C>,
-        };
+        }
 
         impl<'de, C: BulletproofCurveArithmetic> Visitor<'de> for RangeProofVisitor<C> {
             type Value = RangeProof<C>;
@@ -574,7 +577,9 @@ impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for RangeProof<C> {
             }
         }
 
-        deserializer.deserialize_bytes(RangeProofVisitor { _marker: core::marker::PhantomData })
+        deserializer.deserialize_bytes(RangeProofVisitor {
+            _marker: core::marker::PhantomData,
+        })
     }
 }
 
@@ -582,12 +587,17 @@ impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for RangeProof<C> {
 /// \\[
 /// \delta(y,z) = (z - z^{2}) \langle \mathbf{1}, {\mathbf{y}}^{n \cdot m} \rangle - \sum_{j=0}^{m-1} z^{j+3} \cdot \langle \mathbf{1}, {\mathbf{2}}^{n \cdot m} \rangle
 /// \\]
-fn delta(n: usize, m: usize, y: &Scalar, z: &Scalar) -> Scalar {
-    let sum_y = util::sum_of_powers(y, n * m);
-    let sum_2 = util::sum_of_powers(&Scalar::from(2u64), n);
-    let sum_z = util::sum_of_powers(z, m);
+fn delta<C: BulletproofCurveArithmetic>(
+    n: usize,
+    m: usize,
+    y: &C::Scalar,
+    z: &C::Scalar,
+) -> C::Scalar {
+    let sum_y = util::sum_of_powers::<C>(y, n * m);
+    let sum_2 = util::sum_of_powers::<C>(&C::Scalar::from(2u64), n);
+    let sum_z = util::sum_of_powers::<C>(z, m);
 
-    (z - z * z) * sum_y - z * z * z * sum_2 * sum_z
+    (*z - *z * *z) * sum_y - *z * *z * *z * sum_2 * sum_z
 }
 
 #[cfg(test)]
@@ -596,11 +606,40 @@ mod tests {
 
     use crate::generators::PedersenGens;
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn test_delta() {
-        let mut rng = rand::thread_rng();
-        let y = Scalar::random(&mut rng);
-        let z = Scalar::random(&mut rng);
+    fn test_delta_curve25519() {
+        test_delta::<crate::Curve25519>();
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn test_delta_k256() {
+        test_delta::<k256::Secp256k1>();
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn test_delta_p256() {
+        test_delta::<p256::NistP256>();
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn test_delta_bls12_381() {
+        test_delta::<bls12_381_plus::Bls12381G1>();
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn test_delta_bls12_381_std() {
+        test_delta::<blstrs_plus::Bls12381G1>();
+    }
+
+    fn test_delta<C: BulletproofCurveArithmetic>() {
+        let mut rng = thread_rng();
+        let y = C::Scalar::random(&mut rng);
+        let z = C::Scalar::random(&mut rng);
 
         // Choose n = 256 to ensure we overflow the group order during
         // the computation, to check that that's done correctly
@@ -609,9 +648,9 @@ mod tests {
         // code copied from previous implementation
         let z2 = z * z;
         let z3 = z2 * z;
-        let mut power_g = Scalar::ZERO;
-        let mut exp_y = Scalar::ONE; // start at y^0 = 1
-        let mut exp_2 = Scalar::ONE; // start at 2^0 = 1
+        let mut power_g = C::Scalar::ZERO;
+        let mut exp_y = C::Scalar::ONE; // start at y^0 = 1
+        let mut exp_2 = C::Scalar::ONE; // start at 2^0 = 1
         for _ in 0..n {
             power_g += (z - z2) * exp_y - z3 * exp_2;
 
@@ -619,7 +658,7 @@ mod tests {
             exp_2 = exp_2 + exp_2; // 2^i -> 2^(i+1)
         }
 
-        assert_eq!(power_g, delta(n, 1, &y, &z),);
+        assert_eq!(power_g, delta::<C>(n, 1, &y, &z),);
     }
 
     /// Given a bitsize `n`, test the following:
@@ -628,7 +667,7 @@ mod tests {
     /// 2. Serialize to wire format;
     /// 3. Deserialize from wire format;
     /// 4. Verify the proof.
-    fn singleparty_create_and_verify_helper(n: usize, m: usize) {
+    fn singleparty_create_and_verify_helper<C: BulletproofCurveArithmetic>(n: usize, m: usize) {
         // Split the test into two scopes, so that it's explicit what
         // data is shared between the prover and the verifier.
 
@@ -638,22 +677,22 @@ mod tests {
         // Both prover and verifier have access to the generators and the proof
         let max_bitsize = 64;
         let max_parties = 8;
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(max_bitsize, max_parties);
+        let pc_gens = PedersenGens::<C>::default();
+        let bp_gens = BulletproofGens::<C>::new(max_bitsize, max_parties);
 
         // Prover's scope
         let (proof_bytes, value_commitments) = {
             use self::rand::Rng;
-            let mut rng = rand::thread_rng();
+            let mut rng = thread_rng();
 
             // 0. Create witness data
             let (min, max) = (0u64, ((1u128 << n) - 1) as u64);
             let values: Vec<u64> = (0..m).map(|_| rng.gen_range(min..max)).collect();
-            let blindings: Vec<Scalar> = (0..m).map(|_| Scalar::random(&mut rng)).collect();
+            let blindings: Vec<C::Scalar> = (0..m).map(|_| C::Scalar::random(&mut rng)).collect();
 
             // 1. Create the proof
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
-            let (proof, value_commitments) = RangeProof::prove_multiple(
+            let (proof, value_commitments) = RangeProof::<C>::prove_multiple(
                 &bp_gens,
                 &pc_gens,
                 &mut transcript,
@@ -670,7 +709,7 @@ mod tests {
         // Verifier's scope
         {
             // 3. Deserialize
-            let proof: RangeProof = bincode::deserialize(&proof_bytes).unwrap();
+            let proof: RangeProof<C> = bincode::deserialize(&proof_bytes).unwrap();
 
             // 4. Verify with the same customization label as above
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
@@ -681,48 +720,277 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn create_and_verify_n_32_m_1() {
-        singleparty_create_and_verify_helper(32, 1);
+    fn create_and_verify_n_32_m_1_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 1);
     }
 
+    #[cfg(feature = "k256")]
     #[test]
-    fn create_and_verify_n_32_m_2() {
-        singleparty_create_and_verify_helper(32, 2);
+    fn create_and_verify_n_32_m_1_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(32, 1);
     }
 
+    #[cfg(feature = "p256")]
     #[test]
-    fn create_and_verify_n_32_m_4() {
-        singleparty_create_and_verify_helper(32, 4);
+    fn create_and_verify_n_32_m_1_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(32, 1);
     }
 
+    #[cfg(feature = "bls12_381")]
     #[test]
-    fn create_and_verify_n_32_m_8() {
-        singleparty_create_and_verify_helper(32, 8);
+    fn create_and_verify_n_32_m_1_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(32, 1);
     }
 
+    #[cfg(feature = "bls12_381_std")]
     #[test]
-    fn create_and_verify_n_64_m_1() {
-        singleparty_create_and_verify_helper(64, 1);
+    fn create_and_verify_n_32_m_1_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 1);
     }
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn create_and_verify_n_64_m_2() {
-        singleparty_create_and_verify_helper(64, 2);
+    fn create_and_verify_n_32_m_2_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 2);
     }
 
+    #[cfg(feature = "k256")]
     #[test]
-    fn create_and_verify_n_64_m_4() {
-        singleparty_create_and_verify_helper(64, 4);
+    fn create_and_verify_n_32_m_2_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(32, 2);
     }
 
+    #[cfg(feature = "p256")]
     #[test]
-    fn create_and_verify_n_64_m_8() {
-        singleparty_create_and_verify_helper(64, 8);
+    fn create_and_verify_n_32_m_2_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(32, 2);
     }
 
+    #[cfg(feature = "bls12_381")]
     #[test]
-    fn detect_dishonest_party_during_aggregation() {
+    fn create_and_verify_n_32_m_2_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(32, 2);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_32_m_2_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 2);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn create_and_verify_n_32_m_4_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 4);
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn create_and_verify_n_32_m_4_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(32, 4);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn create_and_verify_n_32_m_4_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(32, 4);
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn create_and_verify_n_32_m_4_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(32, 4);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_32_m_4_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 4);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn create_and_verify_n_32_m_8_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 8);
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn create_and_verify_n_32_m_8_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(32, 8);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn create_and_verify_n_32_m_8_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(32, 8);
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn create_and_verify_n_32_m_8_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(32, 8);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_32_m_8_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 8);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn create_and_verify_n_64_m_1_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 1);
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn create_and_verify_n_64_m_1_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(64, 1);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn create_and_verify_n_64_m_1_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(64, 1);
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn create_and_verify_n_64_m_1_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(64, 1);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_64_m_1_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 1);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn create_and_verify_n_64_m_2_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 2);
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn create_and_verify_n_64_m_2_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(64, 2);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn create_and_verify_n_64_m_2_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(64, 2);
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn create_and_verify_n_64_m_2_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(64, 2);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_64_m_2_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 2);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn create_and_verify_n_64_m_4_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 4);
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn create_and_verify_n_64_m_4_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(64, 4);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn create_and_verify_n_64_m_4_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(64, 4);
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn create_and_verify_n_64_m_4_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(64, 4);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_64_m_4_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 4);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn create_and_verify_n_64_m_8_curve25519() {
+        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 8);
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn create_and_verify_n_64_m_8_k256() {
+        singleparty_create_and_verify_helper::<k256::Secp256k1>(64, 8);
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn create_and_verify_n_64_m_8_p256() {
+        singleparty_create_and_verify_helper::<p256::NistP256>(64, 8);
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn create_and_verify_n_64_m_8_bls12_381() {
+        singleparty_create_and_verify_helper::<bls12_381_plus::Bls12381G1>(64, 8);
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn create_and_verify_n_64_m_8_bls12_381_std() {
+        singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 8);
+    }
+
+    #[cfg(feature = "curve25519")]
+    #[test]
+    fn detect_dishonest_party_during_aggregation_curve25519() {
+        detect_dishonest_party_during_aggregation::<crate::Curve25519>();
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn detect_dishonest_party_during_aggregation_k256() {
+        detect_dishonest_party_during_aggregation::<k256::Secp256k1>();
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn detect_dishonest_party_during_aggregation_p256() {
+        detect_dishonest_party_during_aggregation::<p256::NistP256>();
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn detect_dishonest_party_during_aggregation_bls12_381() {
+        detect_dishonest_party_during_aggregation::<bls12_381_plus::Bls12381G1>();
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn detect_dishonest_party_during_aggregation_bls12_381_std() {
+        detect_dishonest_party_during_aggregation::<blstrs_plus::Bls12381G1>();
+    }
+
+    fn detect_dishonest_party_during_aggregation<C: BulletproofCurveArithmetic>() {
         use self::dealer::*;
         use self::party::*;
 
@@ -732,29 +1000,29 @@ mod tests {
         let m = 4;
         let n = 32;
 
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(n, m);
+        let pc_gens = PedersenGens::<C>::default();
+        let bp_gens = BulletproofGens::<C>::new(n, m);
 
         use self::rand::Rng;
-        let mut rng = rand::thread_rng();
+        let mut rng = thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
         let v0 = rng.gen::<u32>() as u64;
-        let v0_blinding = Scalar::random(&mut rng);
+        let v0_blinding = C::Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
         let v2 = rng.gen::<u32>() as u64;
-        let v2_blinding = Scalar::random(&mut rng);
+        let v2_blinding = C::Scalar::random(&mut rng);
         let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n).unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
         let v1 = rng.gen::<u64>();
-        let v1_blinding = Scalar::random(&mut rng);
+        let v1_blinding = C::Scalar::random(&mut rng);
         let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n).unwrap();
 
         let v3 = rng.gen::<u64>();
-        let v3_blinding = Scalar::random(&mut rng);
+        let v3_blinding = C::Scalar::random(&mut rng);
         let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n).unwrap();
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
@@ -795,8 +1063,37 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "curve25519")]
     #[test]
-    fn detect_dishonest_dealer_during_aggregation() {
+    fn detect_dishonest_dealer_during_aggregation_curve25519() {
+        detect_dishonest_dealer_during_aggregation::<crate::Curve25519>();
+    }
+
+    #[cfg(feature = "k256")]
+    #[test]
+    fn detect_dishonest_dealer_during_aggregation_k256() {
+        detect_dishonest_dealer_during_aggregation::<k256::Secp256k1>();
+    }
+
+    #[cfg(feature = "p256")]
+    #[test]
+    fn detect_dishonest_dealer_during_aggregation_p256() {
+        detect_dishonest_dealer_during_aggregation::<p256::NistP256>();
+    }
+
+    #[cfg(feature = "bls12_381")]
+    #[test]
+    fn detect_dishonest_dealer_during_aggregation_bls12_381() {
+        detect_dishonest_dealer_during_aggregation::<bls12_381_plus::Bls12381G1>();
+    }
+
+    #[cfg(feature = "bls12_381_std")]
+    #[test]
+    fn detect_dishonest_dealer_during_aggregation_bls12_381_std() {
+        detect_dishonest_dealer_during_aggregation::<blstrs_plus::Bls12381G1>();
+    }
+
+    fn detect_dishonest_dealer_during_aggregation<C: BulletproofCurveArithmetic>() {
         use self::dealer::*;
         use self::party::*;
         use crate::errors::MPCError;
@@ -805,15 +1102,15 @@ mod tests {
         let m = 1;
         let n = 32;
 
-        let pc_gens = PedersenGens::default();
-        let bp_gens = BulletproofGens::new(n, m);
+        let pc_gens = PedersenGens::<C>::default();
+        let bp_gens = BulletproofGens::<C>::new(n, m);
 
         use self::rand::Rng;
         let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         let v0 = rng.gen::<u32>() as u64;
-        let v0_blinding = Scalar::random(&mut rng);
+        let v0_blinding = C::Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
         let dealer = Dealer::new(&bp_gens, &pc_gens, &mut transcript, n, m).unwrap();
@@ -830,7 +1127,7 @@ mod tests {
             dealer.receive_poly_commitments(vec![poly_com0]).unwrap();
 
         // But now simulate a malicious dealer choosing x = 0
-        poly_challenge.x = Scalar::ZERO;
+        poly_challenge.x = C::Scalar::ZERO;
 
         let maybe_share0 = party0.apply_challenge(&poly_challenge);
 

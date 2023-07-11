@@ -264,6 +264,12 @@ fn sum_of_powers_slow<C: BulletproofCurveArithmetic>(x: &C::Scalar, n: usize) ->
     exp_iter::<C>(*x).take(n).sum()
 }
 
+#[cfg(any(
+    feature = "bls12_381",
+    feature = "bls12_381_std",
+    feature = "curve25519",
+    test
+))]
 /// Given `data` with `len >= 32`, return the first 32 bytes.
 pub fn read32(data: &[u8]) -> [u8; 32] {
     let mut buf32 = [0u8; 32];
@@ -271,6 +277,7 @@ pub fn read32(data: &[u8]) -> [u8; 32] {
     buf32
 }
 
+#[cfg(any(feature = "bls12_381", feature = "bls12_381_std"))]
 pub fn read48(data: &[u8]) -> [u8; 48] {
     let mut buf48 = [0u8; 48];
     buf48.copy_from_slice(&data[..48]);

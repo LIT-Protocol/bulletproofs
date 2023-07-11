@@ -9,7 +9,6 @@
 
 extern crate alloc;
 extern crate core;
-extern crate core;
 
 mod util;
 
@@ -38,7 +37,10 @@ pub use crate::range_proof::RangeProof;
 use subtle::Choice;
 #[cfg(feature = "curve25519")]
 pub use types::curve25519_impls::Curve25519;
-pub use types::{BulletproofCurveArithmetic, PippengerScalar, FromWideBytes, HashToPoint, HashToScalar, ScalarBatchInvert};
+pub use types::{
+    BulletproofCurveArithmetic, FromWideBytes, HashToPoint, HashToScalar, PippengerScalar,
+    ScalarBatchInvert,
+};
 
 trait CtOptionOps<T> {
     fn ok_or<E>(self, err: E) -> Result<T, E>;

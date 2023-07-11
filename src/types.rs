@@ -1,4 +1,4 @@
-use core::fmt::{Debug, Display};
+use core::fmt::Debug;
 use group::{ff::PrimeField, Group, GroupEncoding};
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroize;
@@ -12,7 +12,7 @@ pub trait PippengerScalar: PrimeField + Zeroize {
 /// The hash to curve point methods
 pub trait HashToPoint {
     /// The output point type
-    type Point: Group + GroupEncoding + Default + Display + ConditionallySelectable;
+    type Point: Group + GroupEncoding + Default + ConditionallySelectable;
 
     /// Compute the output from a hash method
     fn hash_to_point(m: &[u8]) -> Self::Point;
@@ -58,7 +58,7 @@ pub trait FromWideBytes: PrimeField {
     fn from_wide_bytes(bytes: &[u8]) -> Self;
 }
 
-pub trait BulletproofCurveArithmetic: Clone + Debug {
+pub trait BulletproofCurveArithmetic: Copy + Clone + Debug {
     const SCALAR_BYTES: usize;
     const POINT_BYTES: usize;
 
@@ -66,7 +66,6 @@ pub trait BulletproofCurveArithmetic: Clone + Debug {
     type Point: Group<Scalar = Self::Scalar>
         + GroupEncoding
         + Default
-        + Display
         + ConditionallySelectable
         + ConstantTimeEq
         + HashToPoint<Point = Self::Point>;
@@ -81,11 +80,10 @@ pub trait BulletproofCurveArithmetic: Clone + Debug {
 #[cfg(feature = "k256")]
 mod k256_impls {
     use super::*;
-    use crate::CtOptionOps;
+    use k256::elliptic_curve::ScalarPrimitive;
     use k256::{
         elliptic_curve::{
             bigint::U512,
-            consts::U64,
             hash2curve::{ExpandMsgXmd, GroupDigest},
             ops::Reduce,
             sec1::FromEncodedPoint,
@@ -113,7 +111,7 @@ mod k256_impls {
 
     impl FromWideBytes for Scalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            let mut repr = k256::WideBytes::from_slice(bytes);
+            let mut repr = k256::WideBytes::clone_from_slice(bytes);
             repr.copy_from_slice(bytes);
             <Scalar as Reduce<U512>>::reduce_bytes(&repr)
         }
@@ -121,11 +119,20 @@ mod k256_impls {
 
     impl PippengerScalar for Scalar {
         fn as_pippenger_scalar(&self) -> [u64; 4] {
-            let mut out = [u64; 4];
-            out.copy_from_slice(elf.as_limbs());
+            let s: ScalarPrimitive<Secp256k1> = (*self).into();
+            let mut out = [0u64; 4];
+            out.copy_from_slice(
+                s.as_limbs()
+                    .iter()
+                    .map(|l| l.0 as u64)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            );
             out
         }
     }
+
+    impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for Secp256k1 {
         const SCALAR_BYTES: usize = 32;
@@ -149,7 +156,7 @@ mod k256_impls {
         }
 
         fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
-            let repr = Scalar::Repr::clone_from_slice(bytes);
+            let repr = <Scalar as PrimeField>::Repr::clone_from_slice(bytes);
             Option::<Scalar>::from(Scalar::from_repr(repr)).ok_or(())
         }
 
@@ -167,8 +174,12 @@ mod p256_impls {
     use super::*;
     use p256::elliptic_curve::ops::Reduce;
     use p256::elliptic_curve::sec1::FromEncodedPoint;
+    use p256::elliptic_curve::ScalarPrimitive;
     use p256::{
-        elliptic_curve::hash2curve::{ExpandMsgXmd, GroupDigest},
+        elliptic_curve::{
+            bigint::U256,
+            hash2curve::{ExpandMsgXmd, GroupDigest},
+        },
         NistP256, ProjectivePoint, Scalar,
     };
 
@@ -195,8 +206,8 @@ mod p256_impls {
             let hi = p256::FieldBytes::from_slice(&bytes[..32]);
             let lo = p256::FieldBytes::from_slice(&bytes[32..]);
 
-            let mut s0 = <Scalar as Reduce<NistP256>>::reduce_bytes(&hi);
-            let s1 = <Scalar as Reduce<NistP256>>::reduce_bytes(&lo);
+            let mut s0 = <Scalar as Reduce<U256>>::reduce_bytes(&hi);
+            let s1 = <Scalar as Reduce<U256>>::reduce_bytes(&lo);
             for _ in 1..=256 {
                 s0 = s0.double();
             }
@@ -206,11 +217,20 @@ mod p256_impls {
 
     impl PippengerScalar for Scalar {
         fn as_pippenger_scalar(&self) -> [u64; 4] {
-            let mut out = [u64; 4];
-            out.copy_from_slice(elf.as_limbs());
+            let s: ScalarPrimitive<NistP256> = (*self).into();
+            let mut out = [0u64; 4];
+            out.copy_from_slice(
+                s.as_limbs()
+                    .iter()
+                    .map(|l| l.0 as u64)
+                    .collect::<Vec<_>>()
+                    .as_slice(),
+            );
             out
         }
     }
+
+    impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for NistP256 {
         const SCALAR_BYTES: usize = 32;
@@ -224,7 +244,7 @@ mod p256_impls {
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
-            let encoded_point = k256::EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
+            let encoded_point = p256::EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
             Option::<ProjectivePoint>::from(ProjectivePoint::from_encoded_point(&encoded_point))
                 .ok_or(())
         }
@@ -234,7 +254,7 @@ mod p256_impls {
         }
 
         fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
-            let repr = Scalar::Repr::clone_from_slice(bytes);
+            let repr = <Scalar as PrimeField>::Repr::clone_from_slice(bytes);
             Option::<Scalar>::from(Scalar::from_repr(repr)).ok_or(())
         }
 
@@ -251,7 +271,7 @@ mod p256_impls {
 mod bls12_381_impls {
     use super::*;
     use crate::util::{read32, read48};
-    use bls12_381_plus::elliptic_curve::hash2curve::{ExpandMsg, ExpandMsgXmd, Expander};
+    use bls12_381_plus::elliptic_curve::hash2curve::ExpandMsgXmd;
     use bls12_381_plus::{Bls12381G1, G1Affine, G1Projective, Scalar};
 
     const DST: &[u8] = b"BLS12381G1_XMD:SHA-256_SSWU_RO_";
@@ -284,6 +304,8 @@ mod bls12_381_impls {
         }
     }
 
+    impl ScalarBatchInvert for Scalar {}
+
     impl BulletproofCurveArithmetic for Bls12381G1 {
         const SCALAR_BYTES: usize = 32;
         const POINT_BYTES: usize = 48;
@@ -292,7 +314,7 @@ mod bls12_381_impls {
         type Point = G1Projective;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
-            p.to_bytes().to_vec()
+            p.to_bytes().as_ref().to_vec()
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
@@ -323,10 +345,7 @@ mod bls12_381_impls {
 mod bls12_381_std_impls {
     use super::*;
     use crate::util::{read32, read48};
-    use blstrs_plus::{
-        elliptic_curve::hash2curve::{ExpandMsg, ExpandMsgXmd, Expander},
-        ff::PrimeFieldBits,
-    };
+    use blstrs_plus::elliptic_curve::hash2curve::ExpandMsgXmd;
     use blstrs_plus::{Bls12381G1, G1Affine, G1Projective, Scalar};
 
     const DST: &[u8] = b"BLS12381G1_XMD:SHA-256_SSWU_RO_";
@@ -359,6 +378,8 @@ mod bls12_381_std_impls {
         }
     }
 
+    impl ScalarBatchInvert for Scalar {}
+
     impl BulletproofCurveArithmetic for Bls12381G1 {
         const SCALAR_BYTES: usize = 32;
         const POINT_BYTES: usize = 48;
@@ -367,7 +388,7 @@ mod bls12_381_std_impls {
         type Point = G1Projective;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
-            p.to_bytes().to_vec()
+            p.to_bytes().as_ref().to_vec()
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
@@ -394,7 +415,7 @@ mod bls12_381_std_impls {
     }
 }
 
-#[cfg(feature = "curve25519")]
+#[cfg(any(feature = "curve25519", test))]
 pub mod curve25519_impls {
     use super::*;
     use crate::util::read32;
@@ -431,6 +452,8 @@ pub mod curve25519_impls {
         }
     }
 
+    impl ScalarBatchInvert for WrappedScalar {}
+
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
     pub struct Curve25519;
 
@@ -450,7 +473,7 @@ pub mod curve25519_impls {
         }
 
         fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
-            s.to_bytes().to_vec()
+            s.0.to_bytes().to_vec()
         }
 
         fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
@@ -461,6 +484,8 @@ pub mod curve25519_impls {
             points: &[Self::Point],
             scalars: &[Self::Scalar],
         ) -> Self::Point {
+            let scalars = scalars.iter().map(|s| s.0).collect::<Vec<_>>();
+            let points = points.iter().map(|p| p.0).collect::<Vec<_>>();
             RistrettoPoint::multiscalar_mul(scalars.iter(), points.iter()).into()
         }
     }
@@ -469,7 +494,7 @@ pub mod curve25519_impls {
 #[cfg(any(feature = "k256", feature = "p256"))]
 fn sum_of_products_pippenger<P, S>(points: &[P], scalars: &[S]) -> P
 where
-    P: Group<Scalar = S> + GroupEncoding + Default + Display + ConditionallySelectable,
+    P: Group<Scalar = S> + GroupEncoding + Default + ConditionallySelectable,
     S: PippengerScalar,
 {
     const WINDOW: usize = 4;
