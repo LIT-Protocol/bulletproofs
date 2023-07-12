@@ -18,8 +18,8 @@ mod notes {
     mod inner_product_proof {}
     #[cfg_attr(feature = "docs", doc(include = "../docs/notes-rp.md"))]
     mod range_proof {}
-    // #[cfg_attr(feature = "docs", doc(include = "../docs/notes-r1cs.md"))]
-    // mod r1cs_proof {}
+    #[cfg_attr(feature = "docs", doc(include = "../docs/notes-r1cs.md"))]
+    mod r1cs_proof {}
 }
 
 mod errors;
@@ -35,7 +35,7 @@ pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens}
 pub use crate::linear_proof::LinearProof;
 pub use crate::range_proof::RangeProof;
 use subtle::Choice;
-#[cfg(feature = "curve25519")]
+#[cfg(any(feature = "curve25519", test))]
 pub use types::curve25519_impls::Curve25519;
 pub use types::{
     BulletproofCurveArithmetic, FromWideBytes, HashToPoint, HashToScalar, PippengerScalar,

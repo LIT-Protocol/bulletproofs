@@ -1,12 +1,15 @@
 //! Definition of linear combinations.
 
-use bls12_381_plus::Scalar;
 use std::iter::FromIterator;
+use std::marker::PhantomData;
 use std::ops::{Add, Mul, Neg, Sub};
+use group::ff::Field;
+use crate::types::*;
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub enum Variable {
+#[non_exhaustive]
+pub enum Variable<C: BulletproofCurveArithmetic> {
     /// Represents an external input specified by a commitment.
     Committed(usize),
     /// Represents the left input of a multiplication gate.
@@ -17,18 +20,20 @@ pub enum Variable {
     MultiplierOutput(usize),
     /// Represents the constant 1.
     One(),
+    /// See <https://github.com/rust-lang/rust/issues/32739>
+    _Unreachable(PhantomData<C>),
 }
 
-impl From<Variable> for LinearCombination {
-    fn from(v: Variable) -> LinearCombination {
+impl<C: BulletproofCurveArithmetic> From<Variable<C>> for LinearCombination<C> {
+    fn from(v: Variable<C>) -> LinearCombination<C> {
         LinearCombination {
-            terms: vec![(v, Scalar::one())],
+            terms: vec![(v, C::Scalar::ONE)],
         }
     }
 }
 
-impl<S: Into<Scalar>> From<S> for LinearCombination {
-    fn from(s: S) -> LinearCombination {
+impl<C: BulletproofCurveArithmetic, S: Into<C::Scalar>> From<S> for LinearCombination<C> {
+    fn from(s: S) -> LinearCombination<C> {
         LinearCombination {
             terms: vec![(Variable::One(), s.into())],
         }
@@ -37,32 +42,32 @@ impl<S: Into<Scalar>> From<S> for LinearCombination {
 
 // Arithmetic on variables produces linear combinations
 
-impl Neg for Variable {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic> Neg for Variable<C> {
+    type Output = LinearCombination<C>;
 
     fn neg(self) -> Self::Output {
         -LinearCombination::from(self)
     }
 }
 
-impl<L: Into<LinearCombination>> Add<L> for Variable {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic, L: Into<LinearCombination<C>>> Add<L> for Variable<C> {
+    type Output = LinearCombination<C>;
 
     fn add(self, other: L) -> Self::Output {
         LinearCombination::from(self) + other.into()
     }
 }
 
-impl<L: Into<LinearCombination>> Sub<L> for Variable {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic, L: Into<LinearCombination<C>>> Sub<L> for Variable<C> {
+    type Output = LinearCombination<C>;
 
     fn sub(self, other: L) -> Self::Output {
         LinearCombination::from(self) - other.into()
     }
 }
 
-impl<S: Into<Scalar>> Mul<S> for Variable {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic, S: Into<C::Scalar>> Mul<S> for Variable<C> {
+    type Output = LinearCombination<C>;
 
     fn mul(self, other: S) -> Self::Output {
         LinearCombination {
@@ -73,30 +78,30 @@ impl<S: Into<Scalar>> Mul<S> for Variable {
 
 // Arithmetic on scalars with variables produces linear combinations
 
-impl Add<Variable> for Scalar {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic> Add<Variable<C>> for C::Scalar {
+    type Output = LinearCombination<C>;
 
-    fn add(self, other: Variable) -> Self::Output {
+    fn add(self, other: Variable<C>) -> Self::Output {
         LinearCombination {
-            terms: vec![(Variable::One(), self), (other, Scalar::one())],
+            terms: vec![(Variable::One(), self), (other, C::Scalar::ONE)],
         }
     }
 }
 
-impl Sub<Variable> for Scalar {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic> Sub<Variable<C>> for C::Scalar {
+    type Output = LinearCombination<C>;
 
-    fn sub(self, other: Variable) -> Self::Output {
+    fn sub(self, other: Variable<C>) -> Self::Output {
         LinearCombination {
-            terms: vec![(Variable::One(), self), (other, -Scalar::one())],
+            terms: vec![(Variable::One(), self), (other, -C::Scalar::ONE)],
         }
     }
 }
 
-impl Mul<Variable> for Scalar {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic> Mul<Variable<C>> for C::Scalar {
+    type Output = LinearCombination<C>;
 
-    fn mul(self, other: Variable) -> Self::Output {
+    fn mul(self, other: Variable<C>) -> Self::Output {
         LinearCombination {
             terms: vec![(other, self)],
         }
@@ -107,20 +112,20 @@ impl Mul<Variable> for Scalar {
 /// [`Variables`](::r1cs::Variable).  Each term is represented by a
 /// `(Variable, Scalar)` pair.
 #[derive(Clone, Debug, PartialEq)]
-pub struct LinearCombination {
-    pub(super) terms: Vec<(Variable, Scalar)>,
+pub struct LinearCombination<C: BulletproofCurveArithmetic> {
+    pub(super) terms: Vec<(Variable<C>, C::Scalar)>,
 }
 
-impl Default for LinearCombination {
+impl<C: BulletproofCurveArithmetic> Default for LinearCombination<C> {
     fn default() -> Self {
         LinearCombination { terms: Vec::new() }
     }
 }
 
-impl FromIterator<(Variable, Scalar)> for LinearCombination {
+impl<C: BulletproofCurveArithmetic> FromIterator<(Variable<C>, C::Scalar)> for LinearCombination<C> {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = (Variable, Scalar)>,
+        T: IntoIterator<Item = (Variable<C>, C::Scalar)>,
     {
         LinearCombination {
             terms: iter.into_iter().collect(),
@@ -128,10 +133,10 @@ impl FromIterator<(Variable, Scalar)> for LinearCombination {
     }
 }
 
-impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
+impl<'a, C: BulletproofCurveArithmetic> FromIterator<&'a (Variable<C>, C::Scalar)> for LinearCombination<C> {
     fn from_iter<T>(iter: T) -> Self
     where
-        T: IntoIterator<Item = &'a (Variable, Scalar)>,
+        T: IntoIterator<Item = &'a (Variable<C>, C::Scalar)>,
     {
         LinearCombination {
             terms: iter.into_iter().cloned().collect(),
@@ -141,7 +146,7 @@ impl<'a> FromIterator<&'a (Variable, Scalar)> for LinearCombination {
 
 // Arithmetic on linear combinations
 
-impl<L: Into<LinearCombination>> Add<L> for LinearCombination {
+impl<C: BulletproofCurveArithmetic, L: Into<LinearCombination<C>>> Add<L> for LinearCombination<C> {
     type Output = Self;
 
     fn add(mut self, rhs: L) -> Self::Output {
@@ -150,7 +155,7 @@ impl<L: Into<LinearCombination>> Add<L> for LinearCombination {
     }
 }
 
-impl<L: Into<LinearCombination>> Sub<L> for LinearCombination {
+impl<C: BulletproofCurveArithmetic, L: Into<LinearCombination<C>>> Sub<L> for LinearCombination<C> {
     type Output = Self;
 
     fn sub(mut self, rhs: L) -> Self::Output {
@@ -160,10 +165,10 @@ impl<L: Into<LinearCombination>> Sub<L> for LinearCombination {
     }
 }
 
-impl Mul<LinearCombination> for Scalar {
-    type Output = LinearCombination;
+impl<C: BulletproofCurveArithmetic> Mul<LinearCombination<C>> for C::Scalar {
+    type Output = LinearCombination<C>;
 
-    fn mul(self, other: LinearCombination) -> Self::Output {
+    fn mul(self, other: LinearCombination<C>) -> Self::Output {
         let out_terms = other
             .terms
             .into_iter()
@@ -173,7 +178,7 @@ impl Mul<LinearCombination> for Scalar {
     }
 }
 
-impl Neg for LinearCombination {
+impl<C: BulletproofCurveArithmetic> Neg for LinearCombination<C> {
     type Output = Self;
 
     fn neg(mut self) -> Self::Output {
@@ -184,7 +189,7 @@ impl Neg for LinearCombination {
     }
 }
 
-impl<S: Into<Scalar>> Mul<S> for LinearCombination {
+impl<C: BulletproofCurveArithmetic, S: Into<C::Scalar>> Mul<S> for LinearCombination<C> {
     type Output = Self;
 
     fn mul(mut self, other: S) -> Self::Output {

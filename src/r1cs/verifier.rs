@@ -1,6 +1,5 @@
 #![allow(non_snake_case)]
 
-use bls12_381_plus::{G1Projective, Scalar};
 use core::borrow::BorrowMut;
 use core::mem;
 use group::ff::Field;
@@ -16,6 +15,7 @@ use crate::generators::{BulletproofGens, PedersenGens};
 use crate::r1cs::Metrics;
 use crate::transcript::TranscriptProtocol;
 use crate::CtOptionOps;
+use crate::types::*;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
 ///
@@ -26,9 +26,9 @@ use crate::CtOptionOps;
 /// When all constraints are added, the verifying code calls `verify`
 /// which consumes the `Verifier` instance, samples random challenges
 /// that instantiate the randomized constraints, and verifies the proof.
-pub struct Verifier<T: BorrowMut<Transcript>> {
+pub struct Verifier<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> {
     transcript: T,
-    constraints: Vec<LinearCombination>,
+    constraints: Vec<LinearCombination<C>>,
 
     /// Records the number of low-level variables allocated in the
     /// constraint system.
@@ -38,14 +38,14 @@ pub struct Verifier<T: BorrowMut<Transcript>> {
     /// `Missing`), so the `num_vars` isn't kept implicitly in the
     /// variable assignments.
     num_vars: usize,
-    V: Vec<G1Projective>,
+    V: Vec<C::Point>,
 
     /// This list holds closures that will be called in the second phase of the protocol,
     /// when non-randomized variables are committed.
     /// After that, the option will flip to None and additional calls to `randomize_constraints`
     /// will invoke closures immediately.
     deferred_constraints:
-        Vec<Box<dyn FnOnce(&mut RandomizingVerifier<T>) -> Result<(), R1CSError>>>,
+        Vec<Box<dyn FnOnce(&mut RandomizingVerifier<T, C>) -> Result<(), R1CSError>>>,
 
     /// Index of a pending multiplier that's not fully assigned yet.
     pending_multiplier: Option<usize>,
@@ -58,20 +58,20 @@ pub struct Verifier<T: BorrowMut<Transcript>> {
 /// monomorphize the closures for the proving and verifying code.
 /// However, this type cannot be instantiated by the user and therefore can only be used within
 /// the callback provided to `specify_randomized_constraints`.
-pub struct RandomizingVerifier<T: BorrowMut<Transcript>> {
-    verifier: Verifier<T>,
+pub struct RandomizingVerifier<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> {
+    verifier: Verifier<T, C>,
 }
 
-impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C> for Verifier<T, C> {
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript.borrow_mut()
     }
 
     fn multiply(
         &mut self,
-        mut left: LinearCombination,
-        mut right: LinearCombination,
-    ) -> (Variable, Variable, Variable) {
+        mut left: LinearCombination<C>,
+        mut right: LinearCombination<C>,
+    ) -> (Variable<C>, Variable<C>, Variable<C>) {
         let var = self.num_vars;
         self.num_vars += 1;
 
@@ -81,15 +81,15 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
         let o_var = Variable::MultiplierOutput(var);
 
         // Constrain l,r,o:
-        left.terms.push((l_var, -Scalar::one()));
-        right.terms.push((r_var, -Scalar::one()));
+        left.terms.push((l_var, -C::Scalar::ONE));
+        right.terms.push((r_var, -C::Scalar::ONE));
         self.constrain(left);
         self.constrain(right);
 
         (l_var, r_var, o_var)
     }
 
-    fn allocate(&mut self, _: Option<Scalar>) -> Result<Variable, R1CSError> {
+    fn allocate(&mut self, _: Option<C::Scalar>) -> Result<Variable<C>, R1CSError> {
         match self.pending_multiplier {
             None => {
                 let i = self.num_vars;
@@ -106,8 +106,8 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
 
     fn allocate_multiplier(
         &mut self,
-        _: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        _: Option<(C::Scalar, C::Scalar)>,
+    ) -> Result<(Variable<C>, Variable<C>, Variable<C>), R1CSError> {
         let var = self.num_vars;
         self.num_vars += 1;
 
@@ -128,7 +128,7 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
         }
     }
 
-    fn constrain(&mut self, lc: LinearCombination) {
+    fn constrain(&mut self, lc: LinearCombination<C>) {
         // TODO: check that the linear combinations are valid
         // (e.g. that variables are valid, that the linear combination
         // evals to 0 for prover, etc).
@@ -136,8 +136,8 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for Verifier<T> {
     }
 }
 
-impl<T: BorrowMut<Transcript>> RandomizableConstraintSystem for Verifier<T> {
-    type RandomizedCS = RandomizingVerifier<T>;
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableConstraintSystem<C> for Verifier<T, C> {
+    type RandomizedCS = RandomizingVerifier<T, C>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
     where
@@ -148,27 +148,27 @@ impl<T: BorrowMut<Transcript>> RandomizableConstraintSystem for Verifier<T> {
     }
 }
 
-impl<T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<T> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C> for RandomizingVerifier<T, C> {
     fn transcript(&mut self) -> &mut Transcript {
         self.verifier.transcript.borrow_mut()
     }
 
     fn multiply(
         &mut self,
-        left: LinearCombination,
-        right: LinearCombination,
-    ) -> (Variable, Variable, Variable) {
+        left: LinearCombination<C>,
+        right: LinearCombination<C>,
+    ) -> (Variable<C>, Variable<C>, Variable<C>) {
         self.verifier.multiply(left, right)
     }
 
-    fn allocate(&mut self, assignment: Option<Scalar>) -> Result<Variable, R1CSError> {
+    fn allocate(&mut self, assignment: Option<C::Scalar>) -> Result<Variable<C>, R1CSError> {
         self.verifier.allocate(assignment)
     }
 
     fn allocate_multiplier(
         &mut self,
-        input_assignments: Option<(Scalar, Scalar)>,
-    ) -> Result<(Variable, Variable, Variable), R1CSError> {
+        input_assignments: Option<(C::Scalar, C::Scalar)>,
+    ) -> Result<(Variable<C>, Variable<C>, Variable<C>), R1CSError> {
         self.verifier.allocate_multiplier(input_assignments)
     }
 
@@ -176,13 +176,13 @@ impl<T: BorrowMut<Transcript>> ConstraintSystem for RandomizingVerifier<T> {
         self.verifier.metrics()
     }
 
-    fn constrain(&mut self, lc: LinearCombination) {
+    fn constrain(&mut self, lc: LinearCombination<C>) {
         self.verifier.constrain(lc)
     }
 }
 
-impl<T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingVerifier<T> {
-    fn challenge_scalar(&mut self, label: &'static [u8]) -> Scalar {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizedConstraintSystem<C> for RandomizingVerifier<T, C> {
+    fn challenge_scalar(&mut self, label: &'static [u8]) -> C::Scalar {
         self.verifier
             .transcript
             .borrow_mut()
@@ -190,7 +190,7 @@ impl<T: BorrowMut<Transcript>> RandomizedConstraintSystem for RandomizingVerifie
     }
 }
 
-impl<T: BorrowMut<Transcript>> Verifier<T> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> Verifier<T, C> {
     /// Construct an empty constraint system with specified external
     /// input variables.
     ///
@@ -243,7 +243,7 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
     ///
     /// Returns a pair of a Pedersen commitment (as a G1Projective point),
     /// and a [`Variable`] corresponding to it, which can be used to form constraints.
-    pub fn commit(&mut self, commitment: G1Projective) -> Variable {
+    pub fn commit(&mut self, commitment: C::Point) -> Variable<C> {
         let i = self.V.len();
         self.V.push(commitment);
 
@@ -270,16 +270,16 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
     /// because they're not needed to construct the proof).
     fn flattened_constraints(
         &mut self,
-        z: &Scalar,
-    ) -> (Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Vec<Scalar>, Scalar) {
+        z: &C::Scalar,
+    ) -> (Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>, C::Scalar) {
         let n = self.num_vars;
         let m = self.V.len();
 
-        let mut wL = vec![Scalar::zero(); n];
-        let mut wR = vec![Scalar::zero(); n];
-        let mut wO = vec![Scalar::zero(); n];
-        let mut wV = vec![Scalar::zero(); m];
-        let mut wc = Scalar::zero();
+        let mut wL = vec![C::Scalar::ZERO; n];
+        let mut wR = vec![C::Scalar::ZERO; n];
+        let mut wO = vec![C::Scalar::ZERO; n];
+        let mut wV = vec![C::Scalar::ZERO; m];
+        let mut wc = C::Scalar::ZERO;
 
         let mut exp_z = *z;
         for lc in self.constraints.iter() {
@@ -339,9 +339,9 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
     /// be added into the constraint system.
     pub fn verify(
         self,
-        proof: &R1CSProof,
-        pc_gens: &PedersenGens,
-        bp_gens: &BulletproofGens,
+        proof: &R1CSProof<C>,
+        pc_gens: &PedersenGens<C>,
+        bp_gens: &BulletproofGens<C>,
     ) -> Result<(), R1CSError> {
         self.verify_and_return_transcript(proof, pc_gens, bp_gens)
             .map(|_| ())
@@ -349,9 +349,9 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
     /// Same as `verify`, but also returns the transcript back to the user.
     pub fn verify_and_return_transcript(
         mut self,
-        proof: &R1CSProof,
-        pc_gens: &PedersenGens,
-        bp_gens: &BulletproofGens,
+        proof: &R1CSProof<C>,
+        pc_gens: &PedersenGens<C>,
+        bp_gens: &BulletproofGens<C>,
     ) -> Result<T, R1CSError> {
         // Commit a length _suffix_ for the number of high-level variables.
         // We cannot do this in advance because user can commit variables one-by-one,
@@ -361,9 +361,9 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
         transcript.append_u64(b"m", self.V.len() as u64);
 
         let n1 = self.num_vars;
-        transcript.validate_and_append_point(b"A_I1", &proof.A_I1)?;
-        transcript.validate_and_append_point(b"A_O1", &proof.A_O1)?;
-        transcript.validate_and_append_point(b"S1", &proof.S1)?;
+        transcript.validate_and_append_point::<C>(b"A_I1", &proof.A_I1)?;
+        transcript.validate_and_append_point::<C>(b"A_O1", &proof.A_O1)?;
+        transcript.validate_and_append_point::<C>(b"S1", &proof.S1)?;
 
         // Process the remaining constraints.
         self = self.create_randomized_constraints()?;
@@ -387,27 +387,27 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
         let gens = bp_gens.share(0);
 
         // These points are the identity in the 1-phase unrandomized case.
-        transcript.append_point(b"A_I2", &proof.A_I2);
-        transcript.append_point(b"A_O2", &proof.A_O2);
-        transcript.append_point(b"S2", &proof.S2);
+        transcript.append_point::<C>(b"A_I2", &proof.A_I2);
+        transcript.append_point::<C>(b"A_O2", &proof.A_O2);
+        transcript.append_point::<C>(b"S2", &proof.S2);
 
-        let y = transcript.challenge_scalar(b"y");
-        let z = transcript.challenge_scalar(b"z");
+        let y = transcript.challenge_scalar::<C>(b"y");
+        let z = transcript.challenge_scalar::<C>(b"z");
 
-        transcript.validate_and_append_point(b"T_1", &proof.T_1)?;
-        transcript.validate_and_append_point(b"T_3", &proof.T_3)?;
-        transcript.validate_and_append_point(b"T_4", &proof.T_4)?;
-        transcript.validate_and_append_point(b"T_5", &proof.T_5)?;
-        transcript.validate_and_append_point(b"T_6", &proof.T_6)?;
+        transcript.validate_and_append_point::<C>(b"T_1", &proof.T_1)?;
+        transcript.validate_and_append_point::<C>(b"T_3", &proof.T_3)?;
+        transcript.validate_and_append_point::<C>(b"T_4", &proof.T_4)?;
+        transcript.validate_and_append_point::<C>(b"T_5", &proof.T_5)?;
+        transcript.validate_and_append_point::<C>(b"T_6", &proof.T_6)?;
 
-        let u = transcript.challenge_scalar(b"u");
-        let x = transcript.challenge_scalar(b"x");
+        let u = transcript.challenge_scalar::<C>(b"u");
+        let x = transcript.challenge_scalar::<C>(b"x");
 
-        transcript.append_scalar(b"t_x", &proof.t_x);
-        transcript.append_scalar(b"t_x_blinding", &proof.t_x_blinding);
-        transcript.append_scalar(b"e_blinding", &proof.e_blinding);
+        transcript.append_scalar::<C>(b"t_x", &proof.t_x);
+        transcript.append_scalar::<C>(b"t_x_blinding", &proof.t_x_blinding);
+        transcript.append_scalar::<C>(b"e_blinding", &proof.e_blinding);
 
-        let w = transcript.challenge_scalar(b"w");
+        let w = transcript.challenge_scalar::<C>(b"w");
 
         let (wL, wR, wO, wV, wc) = self.flattened_constraints(&z);
 
@@ -423,17 +423,17 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
         let y_inv = y.invert().unwrap();
         let y_inv_vec = util::exp_iter(y_inv)
             .take(padded_n)
-            .collect::<Vec<Scalar>>();
+            .collect::<Vec<C::Scalar>>();
         let yneg_wR = wR
             .into_iter()
             .zip(y_inv_vec.iter())
             .map(|(wRi, exp_y_inv)| wRi * exp_y_inv)
-            .chain(iter::repeat(Scalar::zero()).take(pad))
-            .collect::<Vec<Scalar>>();
+            .chain(iter::repeat(C::Scalar::ZERO).take(pad))
+            .collect::<Vec<C::Scalar>>();
 
         let delta = inner_product(&yneg_wR[0..n], &wL);
 
-        let u_for_g = iter::repeat(Scalar::one())
+        let u_for_g = iter::repeat(C::Scalar::ONE)
             .take(n1)
             .chain(iter::repeat(u).take(n2 + pad));
         let u_for_h = u_for_g.clone();
@@ -449,10 +449,10 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
             .iter()
             .zip(u_for_h)
             .zip(s.iter().rev().take(padded_n))
-            .zip(wL.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
-            .zip(wO.into_iter().chain(iter::repeat(Scalar::zero()).take(pad)))
+            .zip(wL.into_iter().chain(iter::repeat(C::Scalar::ZERO).take(pad)))
+            .zip(wO.into_iter().chain(iter::repeat(C::Scalar::ZERO).take(pad)))
             .map(|((((y_inv_i, u_or_1), s_i_inv), wLi), wOi)| {
-                u_or_1 * (y_inv_i * (x * wLi + wOi - b * s_i_inv) - Scalar::one())
+                u_or_1 * (y_inv_i * (x * wLi + wOi - b * s_i_inv) - C::Scalar::ONE)
             });
 
         // Create a `TranscriptRng` from the transcript. The verifier
@@ -464,7 +464,7 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
             .borrow_mut()
             .build_rng()
             .finalize(&mut thread_rng());
-        let r = Scalar::random(&mut rng);
+        let r = C::Scalar::random(&mut rng);
 
         let xx = x * x;
         let rxx = r * xx;
@@ -474,7 +474,7 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
         let T_scalars = [r * x, rxx * x, rxx * xx, rxx * xxx, rxx * xx * xx];
         let T_points = [proof.T_1, proof.T_3, proof.T_4, proof.T_5, proof.T_6];
 
-        let mega_points: Vec<G1Projective> = iter::once(proof.A_I1)
+        let mega_points: Vec<C::Point> = iter::once(proof.A_I1)
             .chain(iter::once(proof.A_O1))
             .chain(iter::once(proof.S1))
             .chain(iter::once(proof.A_I2))
@@ -489,7 +489,7 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
             .chain(proof.ipp_proof.L_vec.iter().copied())
             .chain(proof.ipp_proof.R_vec.iter().copied())
             .collect();
-        let mega_scalars: Vec<Scalar> = iter::once(x) // A_I1
+        let mega_scalars: Vec<C::Scalar> = iter::once(x) // A_I1
             .chain(iter::once(xx)) // A_O1
             .chain(iter::once(xxx)) // S1
             .chain(iter::once(u * x)) // A_I2
@@ -506,7 +506,7 @@ impl<T: BorrowMut<Transcript>> Verifier<T> {
             .chain(u_sq.iter().cloned()) // ipp_proof.L_vec
             .chain(u_inv_sq.iter().copied()) // ipp_proof.R_vec
             .collect();
-        let mega_check = G1Projective::sum_of_products(&mega_points, &mega_scalars);
+        let mega_check = C::pippenger_sum_of_products(&mega_points, &mega_scalars);
 
         mega_check
             .is_identity()

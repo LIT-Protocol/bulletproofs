@@ -46,7 +46,7 @@ sha2 = "0.10"
 vsss-rs = { version = "3.2.2", features = ["curve25519"] }
 
 [features]
-default = ["std"]
+default = ["std", "curve25519"]
 yoloproofs = []
 std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
 nightly = ["subtle/nightly"]
@@ -57,6 +57,8 @@ bls12_381 = ["dep:bls12_381_plus", "dep:sha2"]
 bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
 curve25519 = ["dep:vsss-rs", "dep:sha2"]
 
+[package.metadata."docs.rs"]
+all-features = true
 
 [[test]]
 name = "range_proof"

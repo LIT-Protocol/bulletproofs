@@ -112,8 +112,6 @@ impl<C: BulletproofCurveArithmetic> VecPoly1<C> {
 
 #[cfg(feature = "yoloproofs")]
 impl<C: BulletproofCurveArithmetic> VecPoly3<C>
-where
-    S: PippengerScalar,
 {
     pub fn zero(n: usize) -> Self {
         VecPoly3(

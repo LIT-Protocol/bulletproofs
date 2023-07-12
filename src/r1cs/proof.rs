@@ -1,13 +1,12 @@
 #![allow(non_snake_case)]
 //! Definition of the proof struct.
 
-use bls12_381_plus::{G1Affine, G1Projective, Scalar};
-use group::Curve;
+use std::marker::PhantomData;
+use group::{Group, Curve};
 
 use crate::errors::R1CSError;
 use crate::inner_product_proof::InnerProductProof;
-use crate::util;
-use crate::CtOptionOps;
+use crate::types::*;
 
 use serde::de::Visitor;
 use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
@@ -33,41 +32,41 @@ const TWO_PHASE_COMMITMENTS: u8 = 1;
 /// proof.
 #[derive(Clone, Debug)]
 #[allow(non_snake_case)]
-pub struct R1CSProof {
+pub struct R1CSProof<C: BulletproofCurveArithmetic> {
     /// Commitment to the values of input wires in the first phase.
-    pub(super) A_I1: G1Projective,
+    pub(super) A_I1: C::Point,
     /// Commitment to the values of output wires in the first phase.
-    pub(super) A_O1: G1Projective,
+    pub(super) A_O1: C::Point,
     /// Commitment to the blinding factors in the first phase.
-    pub(super) S1: G1Projective,
+    pub(super) S1: C::Point,
     /// Commitment to the values of input wires in the second phase.
-    pub(super) A_I2: G1Projective,
+    pub(super) A_I2: C::Point,
     /// Commitment to the values of output wires in the second phase.
-    pub(super) A_O2: G1Projective,
+    pub(super) A_O2: C::Point,
     /// Commitment to the blinding factors in the second phase.
-    pub(super) S2: G1Projective,
+    pub(super) S2: C::Point,
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
-    pub(super) T_1: G1Projective,
+    pub(super) T_1: C::Point,
     /// Commitment to the \\(t_3\\) coefficient of \\( t(x) \\)
-    pub(super) T_3: G1Projective,
+    pub(super) T_3: C::Point,
     /// Commitment to the \\(t_4\\) coefficient of \\( t(x) \\)
-    pub(super) T_4: G1Projective,
+    pub(super) T_4: C::Point,
     /// Commitment to the \\(t_5\\) coefficient of \\( t(x) \\)
-    pub(super) T_5: G1Projective,
+    pub(super) T_5: C::Point,
     /// Commitment to the \\(t_6\\) coefficient of \\( t(x) \\)
-    pub(super) T_6: G1Projective,
+    pub(super) T_6: C::Point,
     /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
-    pub(super) t_x: Scalar,
+    pub(super) t_x: C::Scalar,
     /// Blinding factor for the synthetic commitment to \\( t(x) \\)
-    pub(super) t_x_blinding: Scalar,
+    pub(super) t_x_blinding: C::Scalar,
     /// Blinding factor for the synthetic commitment to the
     /// inner-product arguments
-    pub(super) e_blinding: Scalar,
+    pub(super) e_blinding: C::Scalar,
     /// Proof data for the inner-product argument.
-    pub(super) ipp_proof: InnerProductProof,
+    pub(super) ipp_proof: InnerProductProof<C>,
 }
 
-impl R1CSProof {
+impl<C: BulletproofCurveArithmetic> R1CSProof<C> {
     /// Serializes the proof into a byte array of 1 version byte + \\((13 or 16) + 2k\\) 32-byte elements,
     /// where \\(k=\lceil \log_2(n) \rceil\\) and \\(n\\) is the number of multiplication gates.
     ///
@@ -127,7 +126,7 @@ impl R1CSProof {
     /// Deserializes the proof from a byte slice.
     ///
     /// Returns an error if the byte slice cannot be parsed into a `R1CSProof`.
-    pub fn from_bytes(slice: &[u8]) -> Result<R1CSProof, R1CSError> {
+    pub fn from_bytes(slice: &[u8]) -> Result<Self, R1CSError> {
         if slice.is_empty() {
             return Err(R1CSError::FormatError);
         }
@@ -135,77 +134,58 @@ impl R1CSProof {
         let mut slice = &slice[1..];
 
         let minlength = match version {
-            ONE_PHASE_COMMITMENTS => 8 * 48 + 3 * 32,
-            TWO_PHASE_COMMITMENTS => 11 * 48 + 3 * 32,
+            ONE_PHASE_COMMITMENTS => 8 * C::POINT_BYTES + 3 * C::SCALAR_BYTES,
+            TWO_PHASE_COMMITMENTS => 11 * C::POINT_BYTES + 3 * C::SCALAR_BYTES,
             _ => return Err(R1CSError::FormatError),
         };
 
         if slice.len() < minlength {
             return Err(R1CSError::FormatError);
         }
+        let mut pos = 0;
 
         // This macro takes care of counting bytes in the slice
-        macro_rules! read32 {
+        macro_rules! read_point {
             () => {{
-                let tmp = util::read32(slice);
-                slice = &slice[32..];
+                let tmp = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+                    .map_err(|_| R1CSError::FormatError)?;
+                pos += C::POINT_BYTES;
                 tmp
             }};
         }
-        macro_rules! read48 {
+        macro_rules! read_scalar {
             () => {{
-                let tmp = util::read48(slice);
-                slice = &slice[48..];
+                let tmp = C::deserialize_scalar(&slice[pos..pos+C::SCALAR_BYTES])
+                    .map_err(|_| R1CSError::FormatError)?;
+                pos += C::SCALAR_BYTES;
                 tmp
             }};
         }
 
-        let A_I1 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let A_O1 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let S1 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
+        let A_I1 = read_point!();
+        let A_O1 = read_point!();
+        let S1 = read_point!();
         let (A_I2, A_O2, S2) = if version == ONE_PHASE_COMMITMENTS {
             (
-                G1Projective::identity(),
-                G1Projective::identity(),
-                G1Projective::identity(),
+                C::Point::identity(),
+                C::Point::identity(),
+                C::Point::identity(),
             )
         } else {
             (
-                G1Affine::from_compressed(&read48!())
-                    .map(G1Projective::from)
-                    .ok_or(R1CSError::FormatError)?,
-                G1Affine::from_compressed(&read48!())
-                    .map(G1Projective::from)
-                    .ok_or(R1CSError::FormatError)?,
-                G1Affine::from_compressed(&read48!())
-                    .map(G1Projective::from)
-                    .ok_or(R1CSError::FormatError)?,
+                read_point!(),
+                read_point!(),
+                read_point!(),
             )
         };
-        let T_1 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let T_3 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let T_4 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let T_5 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let T_6 = G1Affine::from_compressed(&read48!())
-            .map(G1Projective::from)
-            .ok_or(R1CSError::FormatError)?;
-        let t_x = Scalar::from_bytes(&read32!()).ok_or(R1CSError::FormatError)?;
-        let t_x_blinding = Scalar::from_bytes(&read32!()).ok_or(R1CSError::FormatError)?;
-        let e_blinding = Scalar::from_bytes(&read32!()).ok_or(R1CSError::FormatError)?;
+        let T_1 = read_point!();
+        let T_3 = read_point!();
+        let T_4 = read_point!();
+        let T_5 = read_point!();
+        let T_6 = read_point!();
+        let t_x = read_scalar!();
+        let t_x_blinding = read_scalar!();
+        let e_blinding = read_scalar!();
 
         // XXX: IPPProof from_bytes gives ProofError.
         let ipp_proof = InnerProductProof::from_bytes(slice).map_err(|_| R1CSError::FormatError)?;
@@ -230,7 +210,7 @@ impl R1CSProof {
     }
 }
 
-impl Serialize for R1CSProof {
+impl<C: BulletproofCurveArithmetic> Serialize for R1CSProof<C> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -239,21 +219,23 @@ impl Serialize for R1CSProof {
     }
 }
 
-impl<'de> Deserialize<'de> for R1CSProof {
+impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for R1CSProof<C> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct R1CSProofVisitor;
+        struct R1CSProofVisitor<C: BulletproofCurveArithmetic> {
+            _marker: PhantomData<C>
+        }
 
-        impl<'de> Visitor<'de> for R1CSProofVisitor {
-            type Value = R1CSProof;
+        impl<'de, C: BulletproofCurveArithmetic> Visitor<'de> for R1CSProofVisitor<C> {
+            type Value = R1CSProof<C>;
 
             fn expecting(&self, formatter: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
                 formatter.write_str("a valid R1CSProof")
             }
 
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<R1CSProof, E>
+            fn visit_bytes<E>(self, v: &[u8]) -> Result<R1CSProof<C>, E>
             where
                 E: serde::de::Error,
             {
@@ -268,6 +250,6 @@ impl<'de> Deserialize<'de> for R1CSProof {
             }
         }
 
-        deserializer.deserialize_bytes(R1CSProofVisitor)
+        deserializer.deserialize_bytes(R1CSProofVisitor { _marker: PhantomData })
     }
 }
