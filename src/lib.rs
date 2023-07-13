@@ -92,3 +92,4 @@ pub mod range_proof_mpc {
 #[cfg(feature = "yoloproofs")]
 #[cfg(feature = "std")]
 pub mod r1cs;
+mod serdes;

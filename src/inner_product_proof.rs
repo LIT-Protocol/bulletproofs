@@ -10,17 +10,23 @@ use alloc::vec::Vec;
 use core::iter;
 use group::ff::Field;
 use merlin::Transcript;
+use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 
 use crate::errors::ProofError;
 use crate::transcript::TranscriptProtocol;
 use crate::types::*;
+use crate::serdes::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InnerProductProof<C: BulletproofCurveArithmetic> {
+    #[serde(with = "CurvePointVec::<C>")]
     pub(crate) L_vec: Vec<C::Point>,
+    #[serde(with = "CurvePointVec::<C>")]
     pub(crate) R_vec: Vec<C::Point>,
+    #[serde(with = "CurveScalar::<C>")]
     pub(crate) a: C::Scalar,
+    #[serde(with = "CurveScalar::<C>")]
     pub(crate) b: C::Scalar,
 }
 

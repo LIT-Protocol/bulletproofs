@@ -23,10 +23,10 @@ use crate::inner_product_proof::InnerProductProof;
 use crate::transcript::TranscriptProtocol;
 use crate::types::*;
 use crate::util;
+use crate::serdes::*;
 
 use rand_core::{CryptoRng, RngCore};
-use serde::de::Visitor;
-use serde::{self, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{self, Deserialize, Serialize};
 
 // Modules for MPC protocol
 
@@ -57,22 +57,31 @@ pub mod party;
 /// protocol locally.  That API is exposed in the [`aggregation`](::range_proof_mpc)
 /// module and can be used to perform online aggregation between
 /// parties without revealing secret values to each other.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct RangeProof<C: BulletproofCurveArithmetic> {
+    #[serde(with = "CurvePoint::<C>")]
     /// Commitment to the bits of the value
     A: C::Point,
+    #[serde(with = "CurvePoint::<C>")]
     /// Commitment to the blinding factors
     S: C::Point,
+    #[serde(with = "CurvePoint::<C>")]
     /// Commitment to the \\(t_1\\) coefficient of \\( t(x) \\)
     T_1: C::Point,
+    #[serde(with = "CurvePoint::<C>")]
     /// Commitment to the \\(t_2\\) coefficient of \\( t(x) \\)
     T_2: C::Point,
+    #[serde(with = "CurveScalar::<C>")]
     /// Evaluation of the polynomial \\(t(x)\\) at the challenge point \\(x\\)
     t_x: C::Scalar,
+    #[serde(with = "CurveScalar::<C>")]
     /// Blinding factor for the synthetic commitment to \\(t(x)\\)
     t_x_blinding: C::Scalar,
+    #[serde(with = "CurveScalar::<C>")]
     /// Blinding factor for the synthetic commitment to the inner-product arguments
     e_blinding: C::Scalar,
+    #[serde(bound(serialize = "InnerProductProof<C>: Serialize"))]
+    #[serde(bound(deserialize = "InnerProductProof<C>: Deserialize<'de>"))]
     /// Proof data for the inner-product argument.
     ipp_proof: InnerProductProof<C>,
 }
@@ -538,52 +547,52 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     }
 }
 
-impl<C: BulletproofCurveArithmetic> Serialize for RangeProof<C> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_bytes(&self.to_bytes()[..])
-    }
-}
-
-impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for RangeProof<C> {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        struct RangeProofVisitor<C: BulletproofCurveArithmetic> {
-            _marker: core::marker::PhantomData<C>,
-        }
-
-        impl<'de, C: BulletproofCurveArithmetic> Visitor<'de> for RangeProofVisitor<C> {
-            type Value = RangeProof<C>;
-
-            fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                formatter.write_str("a valid RangeProof")
-            }
-
-            fn visit_bytes<E>(self, v: &[u8]) -> Result<RangeProof<C>, E>
-            where
-                E: serde::de::Error,
-            {
-                // Using Error::custom requires T: Display, which our error
-                // type only implements when it implements std::error::Error.
-                #[cfg(feature = "std")]
-                return RangeProof::from_bytes(v).map_err(serde::de::Error::custom);
-                // In no-std contexts, drop the error message.
-                #[cfg(not(feature = "std"))]
-                return RangeProof::from_bytes(v)
-                    .map_err(|_| serde::de::Error::custom("deserialization error"));
-            }
-        }
-
-        deserializer.deserialize_bytes(RangeProofVisitor {
-            _marker: core::marker::PhantomData,
-        })
-    }
-}
-
+// impl<C: BulletproofCurveArithmetic> Serialize for RangeProof<C> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         serializer.serialize_bytes(&self.to_bytes()[..])
+//     }
+// }
+//
+// impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for RangeProof<C> {
+//     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         struct RangeProofVisitor<C: BulletproofCurveArithmetic> {
+//             _marker: core::marker::PhantomData<C>,
+//         }
+//
+//         impl<'de, C: BulletproofCurveArithmetic> Visitor<'de> for RangeProofVisitor<C> {
+//             type Value = RangeProof<C>;
+//
+//             fn expecting(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+//                 formatter.write_str("a valid RangeProof")
+//             }
+//
+//             fn visit_bytes<E>(self, v: &[u8]) -> Result<RangeProof<C>, E>
+//             where
+//                 E: serde::de::Error,
+//             {
+//                 // Using Error::custom requires T: Display, which our error
+//                 // type only implements when it implements std::error::Error.
+//                 #[cfg(feature = "std")]
+//                 return RangeProof::from_bytes(v).map_err(serde::de::Error::custom);
+//                 // In no-std contexts, drop the error message.
+//                 #[cfg(not(feature = "std"))]
+//                 return RangeProof::from_bytes(v)
+//                     .map_err(|_| serde::de::Error::custom("deserialization error"));
+//             }
+//         }
+//
+//         deserializer.deserialize_bytes(RangeProofVisitor {
+//             _marker: core::marker::PhantomData,
+//         })
+//     }
+// }
+//
 /// Compute
 /// \\[
 /// \delta(y,z) = (z - z^{2}) \langle \mathbf{1}, {\mathbf{y}}^{n \cdot m} \rangle - \sum_{j=0}^{m-1} z^{j+3} \cdot \langle \mathbf{1}, {\mathbf{2}}^{n \cdot m} \rangle
