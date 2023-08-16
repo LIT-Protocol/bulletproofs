@@ -20,8 +20,8 @@ edition = "2021"
 
 [dependencies]
 group = "0.13"
-bls12_381_plus = { version = "0.8.5", optional = true }
-blstrs_plus = { version = "0.8.5", optional = true }
+bls12_381_plus = { version = "0.8", optional = true }
+blstrs_plus = { version = "0.8", optional = true }
 data-encoding = "2.4.0"
 k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
