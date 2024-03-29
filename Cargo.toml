@@ -35,8 +35,7 @@ byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
 thiserror = { version = "1", optional = true }
 merlin = { version = "3", default-features = false }
-# vsss-rs = { version = "3", features = ["curve25519"], optional = true }
-vsss-rs = { version = "4.0.0-rc4", features = ["curve25519"] , optional = true }
+vsss-rs = { version = "3", features = ["curve25519"], optional = true }
 zeroize = "1"
 
 [dev-dependencies]
@@ -45,7 +44,7 @@ criterion = "0.5"
 bincode = "1"
 rand_chacha = "0.3"
 sha2 = "0.10"
-vsss-rs = { version = "4.0.0-rc4", features = ["curve25519"] }
+vsss-rs = { version = "3.2.2", features = ["curve25519"] }
 
 [features]
 default = ["std", "curve25519"]
