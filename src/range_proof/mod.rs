@@ -20,10 +20,10 @@ use merlin::Transcript;
 use crate::errors::ProofError;
 use crate::generators::{BulletproofGens, PedersenGens};
 use crate::inner_product_proof::InnerProductProof;
+use crate::serdes::*;
 use crate::transcript::TranscriptProtocol;
 use crate::types::*;
 use crate::util;
-use crate::serdes::*;
 
 use rand_core::{CryptoRng, RngCore};
 use serde::{self, Deserialize, Serialize};

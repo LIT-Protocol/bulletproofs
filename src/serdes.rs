@@ -3,7 +3,11 @@ use core::{
     marker::PhantomData,
 };
 use group::Group;
-use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeTuple, de::{Visitor, SeqAccess}};
+use serde::{
+    de::{SeqAccess, Visitor},
+    ser::SerializeTuple,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
 
 use crate::BulletproofCurveArithmetic;
 
@@ -41,12 +45,19 @@ impl<C: BulletproofCurveArithmetic> CurveScalar<C> {
                     write!(f, "a sequence of bytes")
                 }
 
-                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
                     let mut bytes = Vec::<u8>::with_capacity(C::SCALAR_BYTES);
                     for _ in 0..C::SCALAR_BYTES {
-                        bytes.push(seq.next_element()?.ok_or_else(|| serde::de::Error::custom("invalid scalar"))?);
+                        bytes.push(
+                            seq.next_element()?
+                                .ok_or_else(|| serde::de::Error::custom("invalid scalar"))?,
+                        );
                     }
-                    C::deserialize_scalar(&bytes).map_err(|_| serde::de::Error::custom("invalid scalar"))
+                    C::deserialize_scalar(&bytes)
+                        .map_err(|_| serde::de::Error::custom("invalid scalar"))
                 }
             }
             d.deserialize_tuple(C::SCALAR_BYTES, ScalarVisitor(PhantomData::<C>))
@@ -88,12 +99,19 @@ impl<C: BulletproofCurveArithmetic> CurvePoint<C> {
                     write!(f, "a sequence of bytes")
                 }
 
-                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error> where A: SeqAccess<'de> {
+                fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+                where
+                    A: SeqAccess<'de>,
+                {
                     let mut bytes = Vec::<u8>::with_capacity(C::POINT_BYTES);
                     for _ in 0..C::POINT_BYTES {
-                        bytes.push(seq.next_element()?.ok_or_else(|| serde::de::Error::custom("invalid point"))?);
+                        bytes.push(
+                            seq.next_element()?
+                                .ok_or_else(|| serde::de::Error::custom("invalid point"))?,
+                        );
                     }
-                    C::deserialize_point(&bytes).map_err(|_| serde::de::Error::custom("invalid point"))
+                    C::deserialize_point(&bytes)
+                        .map_err(|_| serde::de::Error::custom("invalid point"))
                 }
             }
             d.deserialize_tuple(C::POINT_BYTES, PointVisitor(PhantomData::<C>))
@@ -130,7 +148,8 @@ impl<C: BulletproofCurveArithmetic> CurvePointVec<C> {
                 let bytes = data_encoding::BASE64
                     .decode(b64.as_bytes())
                     .map_err(|_| serde::de::Error::custom("invalid base64"))?;
-                *p = C::deserialize_point(&bytes).map_err(|_| serde::de::Error::custom("invalid point"))?;
+                *p = C::deserialize_point(&bytes)
+                    .map_err(|_| serde::de::Error::custom("invalid point"))?;
             }
             Ok(result)
         } else {
@@ -141,7 +160,8 @@ impl<C: BulletproofCurveArithmetic> CurvePointVec<C> {
             let mut pos = &bytes[..];
             let mut result = vec![C::Point::identity(); bytes.len() / C::POINT_BYTES];
             for p in result.iter_mut() {
-                *p = C::deserialize_point(&pos[..C::POINT_BYTES]).map_err(|_| serde::de::Error::custom("invalid point"))?;
+                *p = C::deserialize_point(&pos[..C::POINT_BYTES])
+                    .map_err(|_| serde::de::Error::custom("invalid point"))?;
                 pos = &pos[C::POINT_BYTES..];
             }
             Ok(result)

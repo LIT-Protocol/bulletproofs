@@ -36,6 +36,8 @@ pub use crate::errors::ProofError;
 pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use crate::linear_proof::LinearProof;
 pub use crate::range_proof::RangeProof;
+pub use group;
+pub use merlin;
 pub use transcript::TranscriptProtocol;
 #[cfg(any(feature = "curve25519", test))]
 pub use types::curve25519_impls::Curve25519;
@@ -43,21 +45,19 @@ pub use types::{
     BulletproofCurveArithmetic, FromWideBytes, HashToPoint, HashToScalar, PippengerScalar,
     ScalarBatchInvert,
 };
-pub use group;
-pub use merlin;
 
-#[cfg(feature = "curve25519")]
-pub use vsss_rs;
-#[cfg(feature = "k256")]
-pub use k256;
-#[cfg(feature = "p256")]
-pub use p256;
 #[cfg(feature = "bls12_381")]
 pub use bls12_381_plus;
 #[cfg(feature = "bls12_381_std")]
 pub use blstrs_plus;
 #[cfg(feature = "ed448")]
 pub use ed448_goldilocks_plus as ed448;
+#[cfg(feature = "k256")]
+pub use k256;
+#[cfg(feature = "p256")]
+pub use p256;
+#[cfg(feature = "curve25519")]
+pub use vsss_rs;
 
 trait CtOptionOps<T> {
     fn ok_or<E>(self, err: E) -> Result<T, E>;

@@ -14,9 +14,9 @@ use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
 
 use crate::errors::ProofError;
+use crate::serdes::*;
 use crate::transcript::TranscriptProtocol;
 use crate::types::*;
-use crate::serdes::*;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct InnerProductProof<C: BulletproofCurveArithmetic> {

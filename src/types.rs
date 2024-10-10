@@ -172,13 +172,13 @@ mod k256_impls {
 #[cfg(feature = "p256")]
 mod p256_impls {
     use super::*;
-    use p256::elliptic_curve::ops::Reduce;
     use p256::elliptic_curve::sec1::FromEncodedPoint;
     use p256::elliptic_curve::ScalarPrimitive;
     use p256::{
         elliptic_curve::{
-            bigint::U256,
+            bigint::{NonZero, U512},
             hash2curve::{ExpandMsgXmd, GroupDigest},
+            scalar::FromUintUnchecked,
         },
         NistP256, ProjectivePoint, Scalar,
     };
@@ -203,15 +203,12 @@ mod p256_impls {
 
     impl FromWideBytes for Scalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            let hi = p256::FieldBytes::from_slice(&bytes[..32]);
-            let lo = p256::FieldBytes::from_slice(&bytes[32..]);
+            const WIDE_MODULUS: NonZero<U512> = NonZero::from_uint(U512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"));
+            let mut num = U512::from_be_slice(bytes);
+            num %= WIDE_MODULUS;
 
-            let mut s0 = <Scalar as Reduce<U256>>::reduce_bytes(&hi);
-            let s1 = <Scalar as Reduce<U256>>::reduce_bytes(&lo);
-            for _ in 1..=256 {
-                s0 = s0.double();
-            }
-            s0 + s1
+            let (_, lo) = num.split();
+            Scalar::from_uint_unchecked(lo)
         }
     }
 
@@ -491,24 +488,110 @@ pub mod curve25519_impls {
     }
 }
 
+#[cfg(feature = "p384")]
+pub mod p384_impls {
+    use super::*;
+
+    use elliptic_curve_tools::SumOfProducts;
+    use p384::{
+        elliptic_curve::{
+            bigint::{NonZero, U768},
+            hash2curve::{ExpandMsgXmd, GroupDigest},
+            scalar::FromUintUnchecked,
+            sec1::FromEncodedPoint,
+        },
+        NistP384, ProjectivePoint, Scalar,
+    };
+
+    const DST: &[u8] = b"P384_XMD:SHA-256_SSWU_RO_";
+
+    impl HashToScalar for Scalar {
+        type Scalar = Scalar;
+
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            NistP384::hash_to_scalar::<ExpandMsgXmd<sha2::Sha256>>(&[m], &[DST]).unwrap()
+        }
+    }
+
+    impl HashToPoint for ProjectivePoint {
+        type Point = ProjectivePoint;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            NistP384::hash_from_bytes::<ExpandMsgXmd<sha2::Sha256>>(&[m], &[DST]).unwrap()
+        }
+    }
+
+    impl FromWideBytes for Scalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            const WIDE_MODULUS: NonZero<U768> = NonZero::from_uint(U768::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973"));
+            let mut num = U768::from_be_slice(bytes);
+            num %= WIDE_MODULUS;
+
+            let (_, lo) = num.split();
+            Scalar::from_uint_unchecked(lo)
+        }
+    }
+
+    impl ScalarBatchInvert for Scalar {}
+
+    impl BulletproofCurveArithmetic for Scalar {
+        const SCALAR_BYTES: usize = 48;
+        const POINT_BYTES: usize = 49;
+
+        type Scalar = Scalar;
+        type Point = ProjectivePoint;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_affine().to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            let encoded_point = p384::EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
+            Option::<ProjectivePoint>::from(ProjectivePoint::from_encoded_point(&encoded_point))
+                .ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.to_bytes().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            let repr = <Scalar as PrimeField>::Repr::clone_from_slice(bytes);
+            Option::<Scalar>::from(Scalar::from_repr(repr)).ok_or(())
+        }
+
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
+            let grouped = scalars
+                .iter()
+                .zip(points.iter())
+                .map(|(s, p)| (*s, *p))
+                .collect::<Vec<(Scalar, ProjectivePoint)>>();
+            ProjectivePoint::sum_of_products(&grouped)
+        }
+    }
+}
+
 #[cfg(feature = "ed448")]
 pub mod ed448_impls {
     use super::*;
     use ed448_goldilocks_plus::{
-        elliptic_curve::hash2curve::ExpandMsgXof,
-        Scalar, EdwardsPoint, Ed448, ScalarBytes, WideScalarBytes,
+        elliptic_curve::hash2curve::ExpandMsgXof, Ed448, EdwardsPoint, Scalar, ScalarBytes,
+        WideScalarBytes,
     };
 
     const SCALAR_DST: &[u8] = b"curve448_XOF:SHAKE256_RO_";
     const EDWARDS_DST: &[u8] = b"edwards448_XOF:SHAKE256_ELL2_RO_";
 
     impl HashToScalar for Scalar {
-       type Scalar = Scalar;
+        type Scalar = Scalar;
 
-       fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
-           Scalar::hash::<ExpandMsgXof<sha3::Shake256>>(m, SCALAR_DST)
-       }
-   }
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            Scalar::hash::<ExpandMsgXof<sha3::Shake256>>(m, SCALAR_DST)
+        }
+    }
 
     impl HashToPoint for EdwardsPoint {
         type Point = EdwardsPoint;
@@ -537,7 +620,10 @@ pub mod ed448_impls {
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
-            Option::<EdwardsPoint>::from(EdwardsPoint::from_bytes(<EdwardsPoint as GroupEncoding>::Repr::from_slice(bytes))).ok_or(())
+            Option::<EdwardsPoint>::from(EdwardsPoint::from_bytes(
+                <EdwardsPoint as GroupEncoding>::Repr::from_slice(bytes),
+            ))
+            .ok_or(())
         }
 
         fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
@@ -545,10 +631,14 @@ pub mod ed448_impls {
         }
 
         fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
-            Option::<Scalar>::from(Scalar::from_canonical_bytes(ScalarBytes::from_slice(bytes))).ok_or(())
+            Option::<Scalar>::from(Scalar::from_canonical_bytes(ScalarBytes::from_slice(bytes)))
+                .ok_or(())
         }
 
-        fn pippenger_sum_of_products(points: &[Self::Point], scalars: &[Self::Scalar]) -> Self::Point {
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
             EdwardsPoint::sum_of_products_pippenger(points, scalars)
         }
     }

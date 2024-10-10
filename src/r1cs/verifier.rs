@@ -14,8 +14,8 @@ use crate::errors::R1CSError;
 use crate::generators::{BulletproofGens, PedersenGens};
 use crate::r1cs::Metrics;
 use crate::transcript::TranscriptProtocol;
-use crate::CtOptionOps;
 use crate::types::*;
+use crate::CtOptionOps;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
 ///
@@ -62,7 +62,9 @@ pub struct RandomizingVerifier<T: BorrowMut<Transcript>, C: BulletproofCurveArit
     verifier: Verifier<T, C>,
 }
 
-impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C> for Verifier<T, C> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C>
+    for Verifier<T, C>
+{
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript.borrow_mut()
     }
@@ -136,7 +138,9 @@ impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C
     }
 }
 
-impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableConstraintSystem<C> for Verifier<T, C> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableConstraintSystem<C>
+    for Verifier<T, C>
+{
     type RandomizedCS = RandomizingVerifier<T, C>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
@@ -148,7 +152,9 @@ impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableConstr
     }
 }
 
-impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C> for RandomizingVerifier<T, C> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C>
+    for RandomizingVerifier<T, C>
+{
     fn transcript(&mut self) -> &mut Transcript {
         self.verifier.transcript.borrow_mut()
     }
@@ -181,7 +187,9 @@ impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C
     }
 }
 
-impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizedConstraintSystem<C> for RandomizingVerifier<T, C> {
+impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizedConstraintSystem<C>
+    for RandomizingVerifier<T, C>
+{
     fn challenge_scalar(&mut self, label: &'static [u8]) -> C::Scalar {
         self.verifier
             .transcript
@@ -271,7 +279,13 @@ impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> Verifier<T, C> {
     fn flattened_constraints(
         &mut self,
         z: &C::Scalar,
-    ) -> (Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>, C::Scalar) {
+    ) -> (
+        Vec<C::Scalar>,
+        Vec<C::Scalar>,
+        Vec<C::Scalar>,
+        Vec<C::Scalar>,
+        C::Scalar,
+    ) {
         let n = self.num_vars;
         let m = self.V.len();
 
@@ -449,8 +463,14 @@ impl<T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> Verifier<T, C> {
             .iter()
             .zip(u_for_h)
             .zip(s.iter().rev().take(padded_n))
-            .zip(wL.into_iter().chain(iter::repeat(C::Scalar::ZERO).take(pad)))
-            .zip(wO.into_iter().chain(iter::repeat(C::Scalar::ZERO).take(pad)))
+            .zip(
+                wL.into_iter()
+                    .chain(iter::repeat(C::Scalar::ZERO).take(pad)),
+            )
+            .zip(
+                wO.into_iter()
+                    .chain(iter::repeat(C::Scalar::ZERO).take(pad)),
+            )
             .map(|((((y_inv_i, u_or_1), s_i_inv), wLi), wOi)| {
                 u_or_1 * (y_inv_i * (x * wLi + wOi - b * s_i_inv) - C::Scalar::ONE)
             });

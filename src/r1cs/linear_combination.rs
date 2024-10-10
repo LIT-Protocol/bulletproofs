@@ -1,10 +1,10 @@
 //! Definition of linear combinations.
 
+use crate::types::*;
+use group::ff::Field;
 use std::iter::FromIterator;
 use std::marker::PhantomData;
 use std::ops::{Add, Mul, Neg, Sub};
-use group::ff::Field;
-use crate::types::*;
 
 /// Represents a variable in a constraint system.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -122,7 +122,9 @@ impl<C: BulletproofCurveArithmetic> Default for LinearCombination<C> {
     }
 }
 
-impl<C: BulletproofCurveArithmetic> FromIterator<(Variable<C>, C::Scalar)> for LinearCombination<C> {
+impl<C: BulletproofCurveArithmetic> FromIterator<(Variable<C>, C::Scalar)>
+    for LinearCombination<C>
+{
     fn from_iter<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = (Variable<C>, C::Scalar)>,
@@ -133,7 +135,9 @@ impl<C: BulletproofCurveArithmetic> FromIterator<(Variable<C>, C::Scalar)> for L
     }
 }
 
-impl<'a, C: BulletproofCurveArithmetic> FromIterator<&'a (Variable<C>, C::Scalar)> for LinearCombination<C> {
+impl<'a, C: BulletproofCurveArithmetic> FromIterator<&'a (Variable<C>, C::Scalar)>
+    for LinearCombination<C>
+{
     fn from_iter<T>(iter: T) -> Self
     where
         T: IntoIterator<Item = &'a (Variable<C>, C::Scalar)>,

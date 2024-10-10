@@ -93,7 +93,9 @@ impl<C: BulletproofCurveArithmetic> Drop for Secrets<C> {
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C> for Prover<'g, T, C> {
+impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C>
+    for Prover<'g, T, C>
+{
     fn transcript(&mut self) -> &mut Transcript {
         self.transcript.borrow_mut()
     }
@@ -182,7 +184,9 @@ impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSyst
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableConstraintSystem<C> for Prover<'g, T, C> {
+impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableConstraintSystem<C>
+    for Prover<'g, T, C>
+{
     type RandomizedCS = RandomizingProver<'g, T, C>;
 
     fn specify_randomized_constraints<F>(&mut self, callback: F) -> Result<(), R1CSError>
@@ -194,7 +198,9 @@ impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizableCo
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C> for RandomizingProver<'g, T, C> {
+impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSystem<C>
+    for RandomizingProver<'g, T, C>
+{
     fn transcript(&mut self) -> &mut Transcript {
         self.prover.transcript.borrow_mut()
     }
@@ -227,9 +233,14 @@ impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> ConstraintSyst
     }
 }
 
-impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizedConstraintSystem<C> for RandomizingProver<'g, T, C> {
+impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> RandomizedConstraintSystem<C>
+    for RandomizingProver<'g, T, C>
+{
     fn challenge_scalar(&mut self, label: &'static [u8]) -> C::Scalar {
-        self.prover.transcript.borrow_mut().challenge_scalar::<C>(label)
+        self.prover
+            .transcript
+            .borrow_mut()
+            .challenge_scalar::<C>(label)
     }
 }
 
@@ -316,7 +327,12 @@ impl<'g, T: BorrowMut<Transcript>, C: BulletproofCurveArithmetic> Prover<'g, T, 
     fn flattened_constraints(
         &mut self,
         z: &C::Scalar,
-    ) -> (Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>, Vec<C::Scalar>) {
+    ) -> (
+        Vec<C::Scalar>,
+        Vec<C::Scalar>,
+        Vec<C::Scalar>,
+        Vec<C::Scalar>,
+    ) {
         let n = self.secrets.a_L.len();
         let m = self.secrets.v.len();
 

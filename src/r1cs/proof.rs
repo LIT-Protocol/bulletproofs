@@ -1,8 +1,8 @@
 #![allow(non_snake_case)]
 //! Definition of the proof struct.
 
+use group::{Curve, Group};
 use std::marker::PhantomData;
-use group::{Group, Curve};
 
 use crate::errors::R1CSError;
 use crate::inner_product_proof::InnerProductProof;
@@ -147,7 +147,7 @@ impl<C: BulletproofCurveArithmetic> R1CSProof<C> {
         // This macro takes care of counting bytes in the slice
         macro_rules! read_point {
             () => {{
-                let tmp = C::deserialize_point(&slice[pos..pos+C::POINT_BYTES])
+                let tmp = C::deserialize_point(&slice[pos..pos + C::POINT_BYTES])
                     .map_err(|_| R1CSError::FormatError)?;
                 pos += C::POINT_BYTES;
                 tmp
@@ -155,7 +155,7 @@ impl<C: BulletproofCurveArithmetic> R1CSProof<C> {
         }
         macro_rules! read_scalar {
             () => {{
-                let tmp = C::deserialize_scalar(&slice[pos..pos+C::SCALAR_BYTES])
+                let tmp = C::deserialize_scalar(&slice[pos..pos + C::SCALAR_BYTES])
                     .map_err(|_| R1CSError::FormatError)?;
                 pos += C::SCALAR_BYTES;
                 tmp
@@ -172,11 +172,7 @@ impl<C: BulletproofCurveArithmetic> R1CSProof<C> {
                 C::Point::identity(),
             )
         } else {
-            (
-                read_point!(),
-                read_point!(),
-                read_point!(),
-            )
+            (read_point!(), read_point!(), read_point!())
         };
         let T_1 = read_point!();
         let T_3 = read_point!();
@@ -225,7 +221,7 @@ impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for R1CSProof<C> {
         D: Deserializer<'de>,
     {
         struct R1CSProofVisitor<C: BulletproofCurveArithmetic> {
-            _marker: PhantomData<C>
+            _marker: PhantomData<C>,
         }
 
         impl<'de, C: BulletproofCurveArithmetic> Visitor<'de> for R1CSProofVisitor<C> {
@@ -250,6 +246,8 @@ impl<'de, C: BulletproofCurveArithmetic> Deserialize<'de> for R1CSProof<C> {
             }
         }
 
-        deserializer.deserialize_bytes(R1CSProofVisitor { _marker: PhantomData })
+        deserializer.deserialize_bytes(R1CSProofVisitor {
+            _marker: PhantomData,
+        })
     }
 }

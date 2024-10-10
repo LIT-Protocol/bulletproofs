@@ -24,8 +24,10 @@ bls12_381_plus = { version = "0.8", optional = true }
 blstrs_plus = { version = "0.8", optional = true }
 data-encoding = "2.6"
 ed448-goldilocks-plus = { version = "0.12", optional = true }
+elliptic-curve-tools = { version = "0.1.1", optional = true }
 k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
+p384 = { version = "0.13", features = ["arithmetic", "bits", "hash2curve"], optional = true }
 subtle = { version = "2.5", default-features = false }
 sha2 = { version = "0.10", default-features = false, optional = true }
 sha3 = { version = "0.10", default-features = false }
@@ -60,6 +62,7 @@ bls12_381 = ["dep:bls12_381_plus", "dep:sha2"]
 bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
 curve25519 = ["dep:vsss-rs", "dep:sha2"]
 ed448 = ["dep:ed448-goldilocks-plus"]
+p384 = ["dep:p384", "dep:sha2", "dep:elliptic-curve-tools"]
 
 [package.metadata."docs.rs"]
 all-features = true
