@@ -3,7 +3,6 @@ use rand_core::SeedableRng;
 use rand_chacha::ChaChaRng;
 
 use group::ff::Field;
-use group::Curve;
 
 use merlin::Transcript;
 
@@ -39,6 +38,12 @@ fn generate_test_vectors_bls12_381() {
 // #[test]
 fn generate_test_vectors_bls12_381_std() {
     generate_test_vectors::<blstrs_plus::Bls12381G1>();
+}
+
+#[cfg(feature = "ed448")]
+// #[test]
+fn generate_test_vectors_ed448() {
+    generate_test_vectors::<ed448_goldilocks_plus::Ed448>()
 }
 
 // This function generates test vectors and dumps them to stdout.

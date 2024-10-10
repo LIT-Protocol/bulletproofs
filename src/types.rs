@@ -27,7 +27,7 @@ pub trait HashToScalar {
     fn hash_to_scalar(m: &[u8]) -> Self::Scalar;
 }
 
-pub trait ScalarBatchInvert: PippengerScalar {
+pub trait ScalarBatchInvert: PrimeField + Zeroize {
     fn batch_invert(scalars: &mut [Self]) -> Self {
         let n = scalars.len();
 
@@ -487,6 +487,69 @@ pub mod curve25519_impls {
             let scalars = scalars.iter().map(|s| s.0).collect::<Vec<_>>();
             let points = points.iter().map(|p| p.0).collect::<Vec<_>>();
             RistrettoPoint::multiscalar_mul(scalars.iter(), points.iter()).into()
+        }
+    }
+}
+
+#[cfg(feature = "ed448")]
+pub mod ed448_impls {
+    use super::*;
+    use ed448_goldilocks_plus::{
+        elliptic_curve::hash2curve::ExpandMsgXof,
+        Scalar, EdwardsPoint, Ed448, ScalarBytes, WideScalarBytes,
+    };
+
+    const SCALAR_DST: &[u8] = b"curve448_XOF:SHAKE256_RO_";
+    const EDWARDS_DST: &[u8] = b"edwards448_XOF:SHAKE256_ELL2_RO_";
+
+    impl HashToScalar for Scalar {
+       type Scalar = Scalar;
+
+       fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+           Scalar::hash::<ExpandMsgXof<sha3::Shake256>>(m, SCALAR_DST)
+       }
+   }
+
+    impl HashToPoint for EdwardsPoint {
+        type Point = EdwardsPoint;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            EdwardsPoint::hash::<ExpandMsgXof<sha3::Shake256>>(m, EDWARDS_DST)
+        }
+    }
+
+    impl FromWideBytes for Scalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            Scalar::from_bytes_mod_order_wide(WideScalarBytes::from_slice(bytes))
+        }
+    }
+
+    impl ScalarBatchInvert for Scalar {}
+
+    impl BulletproofCurveArithmetic for Ed448 {
+        const SCALAR_BYTES: usize = 57;
+        const POINT_BYTES: usize = 57;
+        type Scalar = Scalar;
+        type Point = EdwardsPoint;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            Option::<EdwardsPoint>::from(EdwardsPoint::from_bytes(<EdwardsPoint as GroupEncoding>::Repr::from_slice(bytes))).ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.to_bytes_rfc_8032().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            Option::<Scalar>::from(Scalar::from_canonical_bytes(ScalarBytes::from_slice(bytes))).ok_or(())
+        }
+
+        fn pippenger_sum_of_products(points: &[Self::Point], scalars: &[Self::Scalar]) -> Self::Point {
+            EdwardsPoint::sum_of_products_pippenger(points, scalars)
         }
     }
 }
