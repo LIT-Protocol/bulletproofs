@@ -56,6 +56,8 @@ pub use p256;
 pub use bls12_381_plus;
 #[cfg(feature = "bls12_381_std")]
 pub use blstrs_plus;
+#[cfg(feature = "ed448")]
+pub use ed448_goldilocks_plus as ed448;
 
 trait CtOptionOps<T> {
     fn ok_or<E>(self, err: E) -> Result<T, E>;
