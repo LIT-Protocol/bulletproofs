@@ -534,7 +534,7 @@ pub mod p384_impls {
 
     impl ScalarBatchInvert for Scalar {}
 
-    impl BulletproofCurveArithmetic for Scalar {
+    impl BulletproofCurveArithmetic for NistP384 {
         const SCALAR_BYTES: usize = 48;
         const POINT_BYTES: usize = 49;
 
