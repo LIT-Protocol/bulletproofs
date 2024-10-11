@@ -56,6 +56,8 @@ pub use ed448_goldilocks_plus as ed448;
 pub use k256;
 #[cfg(feature = "p256")]
 pub use p256;
+#[cfg(feature = "p384")]
+pub use p384;
 #[cfg(feature = "curve25519")]
 pub use vsss_rs;
 
