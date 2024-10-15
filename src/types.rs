@@ -577,10 +577,13 @@ pub mod p384_impls {
 #[cfg(feature = "ed448")]
 pub mod ed448_impls {
     use super::*;
+    use crate::ed448;
     use ed448_goldilocks_plus::{
         elliptic_curve::hash2curve::ExpandMsgXof, Ed448, EdwardsPoint, Scalar, ScalarBytes,
         WideScalarBytes,
     };
+    use elliptic_curve_tools::SumOfProducts;
+    use p384::ProjectivePoint;
 
     const SCALAR_DST: &[u8] = b"curve448_XOF:SHAKE256_RO_";
     const EDWARDS_DST: &[u8] = b"edwards448_XOF:SHAKE256_ELL2_RO_";
@@ -639,7 +642,12 @@ pub mod ed448_impls {
             points: &[Self::Point],
             scalars: &[Self::Scalar],
         ) -> Self::Point {
-            EdwardsPoint::sum_of_products_pippenger(points, scalars)
+            let grouped = scalars
+                .iter()
+                .zip(points.iter())
+                .map(|(s, p)| (*s, *p))
+                .collect::<Vec<(Scalar, EdwardsPoint)>>();
+            EdwardsPoint::sum_of_products(&grouped)
         }
     }
 }
