@@ -80,7 +80,7 @@ impl<'a, C: BulletproofCurveArithmetic> PartyAwaitingPosition<'a, C> {
         self,
         j: usize,
     ) -> Result<(PartyAwaitingBitChallenge<'a, C>, BitCommitment<C>), MPCError> {
-        self.assign_position_with_rng(j, &mut thread_rng())
+        self.assign_position_with_rng(j, thread_rng())
     }
 
     /// Assigns a position in the aggregated proof to this party,
@@ -120,8 +120,8 @@ impl<'a, C: BulletproofCurveArithmetic> PartyAwaitingPosition<'a, C> {
             .chain(bp_share.H(self.n).copied())
             .collect();
         let S_scalars: Vec<C::Scalar> = iter::once(s_blinding)
-            .chain(s_L.clone().into_iter())
-            .chain(s_R.clone().into_iter())
+            .chain(s_L.clone())
+            .chain(s_R.clone())
             .collect();
         let S = C::pippenger_sum_of_products(&S_points, &S_scalars);
 
@@ -176,7 +176,7 @@ impl<'a, C: BulletproofCurveArithmetic> PartyAwaitingBitChallenge<'a, C> {
         self,
         vc: &BitChallenge<C>,
     ) -> (PartyAwaitingPolyChallenge<C>, PolyCommitment<C>) {
-        self.apply_challenge_with_rng(vc, &mut thread_rng())
+        self.apply_challenge_with_rng(vc, thread_rng())
     }
 
     /// Receive a [`BitChallenge`] from the dealer and use it to

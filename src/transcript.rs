@@ -1,6 +1,7 @@
 //! Defines a `TranscriptProtocol` trait for using a Merlin transcript.
 
 use crate::types::{BulletproofCurveArithmetic, FromWideBytes};
+use group::ff::PrimeField;
 use group::Group;
 use merlin::Transcript;
 
@@ -108,7 +109,8 @@ impl TranscriptProtocol for Transcript {
         &mut self,
         label: &'static [u8],
     ) -> C::Scalar {
-        let mut buf = [0u8; 64];
+        let repr = <C::Scalar as PrimeField>::Repr::default();
+        let mut buf = vec![0u8; repr.as_ref().len()];
         self.challenge_bytes(label, &mut buf);
 
         C::Scalar::from_wide_bytes(&buf)

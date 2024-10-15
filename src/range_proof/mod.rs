@@ -305,7 +305,7 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
             values,
             blindings,
             n,
-            &mut thread_rng(),
+            thread_rng(),
         )
     }
 
@@ -423,8 +423,8 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
             .chain(iter::once(self.S))
             .chain(iter::once(self.T_1))
             .chain(iter::once(self.T_2))
-            .chain(self.ipp_proof.L_vec.clone().into_iter())
-            .chain(self.ipp_proof.R_vec.clone().into_iter())
+            .chain(self.ipp_proof.L_vec.clone())
+            .chain(self.ipp_proof.R_vec.clone())
             .chain(iter::once(pc_gens.B_blinding))
             .chain(iter::once(pc_gens.B))
             .chain(bp_gens.G(n, m).copied())
