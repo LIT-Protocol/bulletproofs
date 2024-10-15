@@ -110,7 +110,7 @@ impl TranscriptProtocol for Transcript {
         label: &'static [u8],
     ) -> C::Scalar {
         let repr = <C::Scalar as PrimeField>::Repr::default();
-        let mut buf = vec![0u8; repr.as_ref().len()];
+        let mut buf = vec![0u8; repr.as_ref().len() * 2];
         self.challenge_bytes(label, &mut buf);
 
         C::Scalar::from_wide_bytes(&buf)
