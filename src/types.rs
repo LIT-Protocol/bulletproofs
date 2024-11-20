@@ -135,11 +135,11 @@ mod k256_impls {
     impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for Secp256k1 {
-        const SCALAR_BYTES: usize = 32;
-        const POINT_BYTES: usize = 33;
-
-        type Scalar = Scalar;
         type Point = ProjectivePoint;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 33;
+        const SCALAR_BYTES: usize = 32;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_affine().to_bytes().to_vec()
@@ -230,11 +230,11 @@ mod p256_impls {
     impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for NistP256 {
-        const SCALAR_BYTES: usize = 32;
-        const POINT_BYTES: usize = 33;
-
-        type Scalar = Scalar;
         type Point = ProjectivePoint;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 33;
+        const SCALAR_BYTES: usize = 32;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_affine().to_bytes().to_vec()
@@ -304,11 +304,11 @@ mod bls12_381_impls {
     impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for Bls12381G1 {
-        const SCALAR_BYTES: usize = 32;
-        const POINT_BYTES: usize = 48;
-
-        type Scalar = Scalar;
         type Point = G1Projective;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 48;
+        const SCALAR_BYTES: usize = 32;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_bytes().as_ref().to_vec()
@@ -378,11 +378,11 @@ mod bls12_381_std_impls {
     impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for Bls12381G1 {
-        const SCALAR_BYTES: usize = 32;
-        const POINT_BYTES: usize = 48;
-
-        type Scalar = Scalar;
         type Point = G1Projective;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 48;
+        const SCALAR_BYTES: usize = 32;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_bytes().as_ref().to_vec()
@@ -455,11 +455,11 @@ pub mod curve25519_impls {
     pub struct Curve25519;
 
     impl BulletproofCurveArithmetic for Curve25519 {
-        const SCALAR_BYTES: usize = 32;
-        const POINT_BYTES: usize = 32;
-
-        type Scalar = WrappedScalar;
         type Point = WrappedRistretto;
+        type Scalar = WrappedScalar;
+
+        const POINT_BYTES: usize = 32;
+        const SCALAR_BYTES: usize = 32;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_bytes().to_vec()
@@ -489,7 +489,7 @@ pub mod curve25519_impls {
 }
 
 #[cfg(feature = "p384")]
-pub mod p384_impls {
+mod p384_impls {
     use super::*;
 
     use elliptic_curve_tools::SumOfProducts;
@@ -535,11 +535,11 @@ pub mod p384_impls {
     impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for NistP384 {
-        const SCALAR_BYTES: usize = 48;
-        const POINT_BYTES: usize = 49;
-
-        type Scalar = Scalar;
         type Point = ProjectivePoint;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 49;
+        const SCALAR_BYTES: usize = 48;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_affine().to_bytes().to_vec()
@@ -575,7 +575,7 @@ pub mod p384_impls {
 }
 
 #[cfg(feature = "ed448")]
-pub mod ed448_impls {
+mod ed448_impls {
     use super::*;
     use crate::ed448;
     use ed448_goldilocks_plus::{
@@ -613,10 +613,11 @@ pub mod ed448_impls {
     impl ScalarBatchInvert for Scalar {}
 
     impl BulletproofCurveArithmetic for Ed448 {
-        const SCALAR_BYTES: usize = 57;
-        const POINT_BYTES: usize = 57;
-        type Scalar = Scalar;
         type Point = EdwardsPoint;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 57;
+        const SCALAR_BYTES: usize = 57;
 
         fn serialize_point(p: &Self::Point) -> Vec<u8> {
             p.to_bytes().to_vec()
@@ -648,6 +649,89 @@ pub mod ed448_impls {
                 .map(|(s, p)| (*s, *p))
                 .collect::<Vec<(Scalar, EdwardsPoint)>>();
             EdwardsPoint::sum_of_products(&grouped)
+        }
+    }
+}
+
+#[cfg(feature = "decaf377")]
+mod decaf377_impls {
+    use super::*;
+    use blake2::{Blake2b512, Digest};
+    use decaf377::{Element as ProjectivePoint, Fq, Fr as Scalar};
+    use elliptic_curve::{
+        group::GroupEncoding,
+        hash2curve::{ExpandMsg, ExpandMsgXmd, Expander},
+    };
+
+    impl HashToScalar for Scalar {
+        type Scalar = Scalar;
+
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            let output = Blake2b512::digest(m);
+            Scalar::from_le_bytes_mod_order(&output[..])
+        }
+    }
+
+    impl HashToPoint for ProjectivePoint {
+        type Point = ProjectivePoint;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            const DST: &'static [u8] = b"DECAF377_XMD:BLAKE2B-512_ELL_RO_";
+
+            let mut expander = ExpandMsgXmd::<Blake2b512>::expand_message(&[m], &[DST], 96)
+                .expect("expander creation to succeed");
+            let mut uniform_bytes = [0u8; 48];
+            expander.fill_bytes(&mut uniform_bytes);
+            let one = Fq::from_le_bytes_mod_order(&uniform_bytes);
+            expander.fill_bytes(&mut uniform_bytes);
+            let two = Fq::from_le_bytes_mod_order(&uniform_bytes);
+
+            Self::hash_to_curve(&one, &two)
+        }
+    }
+
+    impl FromWideBytes for Scalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            Scalar::from_le_bytes_mod_order(bytes)
+        }
+    }
+
+    impl ScalarBatchInvert for Scalar {}
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    pub struct Decaf377;
+
+    impl BulletproofCurveArithmetic for Decaf377 {
+        type Point = ProjectivePoint;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 32;
+        const SCALAR_BYTES: usize = 32;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            let mut repr = <ProjectivePoint as GroupEncoding>::Repr::default();
+            repr.copy_from_slice(bytes);
+            Option::<ProjectivePoint>::from(ProjectivePoint::from_bytes(&repr)).ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.to_bytes().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            let repr: [u8; 32] = bytes.try_into().map_err(|_| ())?;
+            Scalar::from_bytes_checked(&repr).map_err(|_| ())
+        }
+
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
+            ProjectivePoint::vartime_multiscalar_mul(scalars, points)
         }
     }
 }

@@ -19,12 +19,16 @@ description = "A pure-Rust implementation of Bulletproofs"
 edition = "2021"
 
 [dependencies]
+blake2 = { version = "0.10", optional = true }
 group = "0.13"
 bls12_381_plus = { version = "0.8", optional = true }
 blstrs_plus = { version = "0.8", optional = true }
 data-encoding = "2.6"
+decaf377 = { version = "0.10", git = "https://github.com/LIT-Protocol/decaf377.git", optional = true }
 ed448-goldilocks-plus = { version = "0.13", optional = true }
+elliptic-curve = { version = "0.13.8", default-features = false, features = ["arithmetic", "hash2curve"], optional = true }
 elliptic-curve-tools = { version = "0.1.2", optional = true }
+jubjub-plus = { version = "0.10", optional = true }
 k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p384 = { version = "0.13", features = ["arithmetic", "bits", "hash2curve"], optional = true }
@@ -36,7 +40,7 @@ rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
 rand = { version = "0.8", default-features = false, optional = true }
 byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
-thiserror = { version = "1", optional = true }
+thiserror = { version = "2", optional = true }
 merlin = { version = "3", default-features = false }
 vsss-rs = { version = "4.3.8", features = ["curve25519"], optional = true }
 zeroize = "1"
@@ -63,6 +67,8 @@ bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
 curve25519 = ["dep:vsss-rs", "dep:sha2"]
 ed448 = ["dep:ed448-goldilocks-plus"]
 p384 = ["dep:p384", "dep:sha2", "dep:elliptic-curve-tools"]
+decaf377 = ["dep:decaf377", "dep:blake2", "dep:elliptic-curve"]
+jubjub = ["dep:jubjub-plus", "dep:blake2"]
 
 [package.metadata."docs.rs"]
 all-features = true
