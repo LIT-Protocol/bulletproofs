@@ -68,7 +68,7 @@ curve25519 = ["dep:vsss-rs", "dep:sha2"]
 ed448 = ["dep:ed448-goldilocks-plus"]
 p384 = ["dep:p384", "dep:sha2", "dep:elliptic-curve-tools"]
 decaf377 = ["dep:decaf377", "dep:blake2", "dep:elliptic-curve"]
-jubjub = ["dep:jubjub-plus", "dep:blake2"]
+jubjub = ["dep:jubjub-plus", "dep:blake2", "dep:elliptic-curve", "dep:elliptic-curve-tools"]
 
 [package.metadata."docs.rs"]
 all-features = true

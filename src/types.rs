@@ -577,13 +577,11 @@ mod p384_impls {
 #[cfg(feature = "ed448")]
 mod ed448_impls {
     use super::*;
-    use crate::ed448;
     use ed448_goldilocks_plus::{
         elliptic_curve::hash2curve::ExpandMsgXof, Ed448, EdwardsPoint, Scalar, ScalarBytes,
         WideScalarBytes,
     };
     use elliptic_curve_tools::SumOfProducts;
-    use p384::ProjectivePoint;
 
     const SCALAR_DST: &[u8] = b"curve448_XOF:SHAKE256_RO_";
     const EDWARDS_DST: &[u8] = b"edwards448_XOF:SHAKE256_ELL2_RO_";
@@ -732,6 +730,83 @@ mod decaf377_impls {
             scalars: &[Self::Scalar],
         ) -> Self::Point {
             ProjectivePoint::vartime_multiscalar_mul(scalars, points)
+        }
+    }
+}
+
+#[cfg(feature = "jubjub")]
+mod jubjub_impls {
+    use super::*;
+    use elliptic_curve::{group::GroupEncoding, hash2curve::ExpandMsgXmd};
+    use elliptic_curve_tools::SumOfProducts;
+    use jubjub_plus::{ExtendedPoint, Scalar, SubgroupPoint};
+
+    impl HashToScalar for Scalar {
+        type Scalar = Scalar;
+
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            const DST: &'static [u8] = b"JubJub_XMD:BLAKE2b-512";
+            Scalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, &DST)
+        }
+    }
+
+    impl HashToPoint for SubgroupPoint {
+        type Point = SubgroupPoint;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            const DST: &'static [u8] = b"JubJub_XMD:BLAKE2b-512_RO_";
+            ExtendedPoint::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, &DST).into()
+        }
+    }
+
+    impl FromWideBytes for Scalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            let repr = bytes.try_into().expect("64 bytes");
+            Scalar::from_bytes_wide(&repr)
+        }
+    }
+
+    impl ScalarBatchInvert for Scalar {}
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    pub struct Jubjub;
+
+    impl BulletproofCurveArithmetic for Jubjub {
+        type Point = SubgroupPoint;
+        type Scalar = Scalar;
+
+        const POINT_BYTES: usize = 32;
+        const SCALAR_BYTES: usize = 32;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            let mut repr = <SubgroupPoint as GroupEncoding>::Repr::default();
+            repr.copy_from_slice(bytes);
+            Option::<SubgroupPoint>::from(SubgroupPoint::from_bytes(&repr)).ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.to_bytes().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            let repr: [u8; 32] = bytes.try_into().map_err(|_| ())?;
+            Option::<Scalar>::from(Scalar::from_bytes(&repr)).ok_or(())
+        }
+
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
+            let grouped = scalars
+                .iter()
+                .zip(points.iter())
+                .map(|(s, p)| (*s, *p))
+                .collect::<Vec<(Scalar, SubgroupPoint)>>();
+            SubgroupPoint::sum_of_products(&grouped)
         }
     }
 }

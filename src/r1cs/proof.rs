@@ -131,7 +131,7 @@ impl<C: BulletproofCurveArithmetic> R1CSProof<C> {
             return Err(R1CSError::FormatError);
         }
         let version = slice[0];
-        let mut slice = &slice[1..];
+        let slice = &slice[1..];
 
         let minlength = match version {
             ONE_PHASE_COMMITMENTS => 8 * C::POINT_BYTES + 3 * C::SCALAR_BYTES,
@@ -142,7 +142,6 @@ impl<C: BulletproofCurveArithmetic> R1CSProof<C> {
         if slice.len() < minlength {
             return Err(R1CSError::FormatError);
         }
-        let mut pos = 0;
 
         // This macro takes care of counting bytes in the slice
         macro_rules! read_point {
