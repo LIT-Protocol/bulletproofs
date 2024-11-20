@@ -652,7 +652,7 @@ mod ed448_impls {
 }
 
 #[cfg(feature = "decaf377")]
-mod decaf377_impls {
+pub mod decaf377_impls {
     use super::*;
     use blake2::{Blake2b512, Digest};
     use decaf377::{Element as ProjectivePoint, Fq, Fr as Scalar};
@@ -735,7 +735,7 @@ mod decaf377_impls {
 }
 
 #[cfg(feature = "jubjub")]
-mod jubjub_impls {
+pub mod jubjub_impls {
     use super::*;
     use elliptic_curve::{group::GroupEncoding, hash2curve::ExpandMsgXmd};
     use elliptic_curve_tools::SumOfProducts;
@@ -769,9 +769,9 @@ mod jubjub_impls {
     impl ScalarBatchInvert for Scalar {}
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
-    pub struct Jubjub;
+    pub struct JubJub;
 
-    impl BulletproofCurveArithmetic for Jubjub {
+    impl BulletproofCurveArithmetic for JubJub {
         type Point = SubgroupPoint;
         type Scalar = Scalar;
 

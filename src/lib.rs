@@ -40,6 +40,10 @@ pub use merlin;
 pub use transcript::TranscriptProtocol;
 #[cfg(any(feature = "curve25519", test))]
 pub use types::curve25519_impls::Curve25519;
+#[cfg(any(feature = "decaf377", test))]
+pub use types::decaf377_impls::Decaf377;
+#[cfg(any(feature = "jubjub", test))]
+pub use types::jubjub_impls::JubJub;
 pub use types::{
     BulletproofCurveArithmetic, FromWideBytes, HashToPoint, HashToScalar, PippengerScalar,
     ScalarBatchInvert,
