@@ -493,17 +493,16 @@ pub mod ed25519_impls {
     use super::*;
     use crate::util::read32;
     use curve25519_dalek_ml::EdwardsPoint;
+    use elliptic_curve::hash2curve::ExpandMsgXmd;
     use vsss_rs::curve25519::WrappedEdwards;
-    use vsss_rs::{
-        curve25519::{WrappedRistretto, WrappedScalar},
-        curve25519_dalek::{traits::MultiscalarMul, RistrettoPoint, Scalar},
-    };
+    use vsss_rs::{curve25519::WrappedScalar, curve25519_dalek::traits::MultiscalarMul};
 
+    #[cfg(not(feature = "ristretto25519"))]
     impl HashToScalar for WrappedScalar {
         type Scalar = WrappedScalar;
 
         fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
-            Scalar::hash_from_bytes::<sha2::Sha512>(m).into()
+            vsss_rs::curve25519_dalek::Scalar::hash_from_bytes::<sha2::Sha512>(m).into()
         }
     }
 
@@ -512,24 +511,30 @@ pub mod ed25519_impls {
 
         fn hash_to_point(m: &[u8]) -> Self::Point {
             const DST: &[u8] = b"edwards25519_XMD:SHA-512_ELL2_RO_";
-            let pt = EdwardsPoint::hash_to_curve(m, DST);
+            let pt = EdwardsPoint::hash_to_curve::<ExpandMsgXmd<sha2::Sha512>>(m, DST);
             let pt = unsafe { std::mem::transmute(pt) };
             WrappedEdwards(pt)
         }
     }
 
+    #[cfg(not(feature = "ristretto25519"))]
     impl FromWideBytes for WrappedScalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            Scalar::from_bytes_mod_order_wide(&<[u8; 64]>::try_from(bytes).unwrap()).into()
+            vsss_rs::curve25519_dalek::Scalar::from_bytes_mod_order_wide(
+                &<[u8; 64]>::try_from(bytes).unwrap(),
+            )
+            .into()
         }
     }
 
+    #[cfg(not(feature = "ristretto25519"))]
     impl PippengerScalar for WrappedScalar {
         fn as_pippenger_scalar(&self) -> [u64; 4] {
             todo!()
         }
     }
 
+    #[cfg(not(feature = "ristretto25519"))]
     impl ScalarBatchInvert for WrappedScalar {}
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
