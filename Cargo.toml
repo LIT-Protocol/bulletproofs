@@ -23,6 +23,7 @@ blake2 = { version = "0.10", optional = true }
 group = "0.13"
 bls12_381_plus = { version = "0.8", optional = true }
 blstrs_plus = { version = "0.8", optional = true }
+curve25519-dalek-ml = { version = "4.2.2", features = ["group", "group-bits", "zeroize"], optional = true }
 data-encoding = "2.6"
 decaf377 = { version = "0.10", git = "https://github.com/LIT-Protocol/decaf377.git", optional = true }
 ed448-goldilocks-plus = { version = "0.13", optional = true }
@@ -32,7 +33,7 @@ jubjub-plus = { version = "0.10", optional = true }
 k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p384 = { version = "0.13", features = ["arithmetic", "bits", "hash2curve"], optional = true }
-subtle = { version = "2.5", default-features = false }
+subtle = { version = "2.6", default-features = false }
 sha2 = { version = "0.10", default-features = false, optional = true }
 sha3 = { version = "0.10", default-features = false }
 digest = { version = "0.10", default-features = false }
@@ -42,7 +43,7 @@ byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
 thiserror = { version = "2", optional = true }
 merlin = { version = "3", default-features = false }
-vsss-rs = { version = "5.0.0-rc1", features = ["curve25519"], optional = true }
+vsss-rs = { version = "5.0.0", features = ["curve25519"], optional = true }
 zeroize = "1"
 
 [dev-dependencies]
@@ -53,7 +54,7 @@ rand_chacha = "0.3"
 sha2 = "0.10"
 
 [features]
-default = ["std", "curve25519"]
+default = ["std"]
 yoloproofs = []
 std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
 nightly = ["subtle/nightly"]
@@ -62,7 +63,8 @@ k256 = ["dep:k256", "dep:sha2"]
 p256 = ["dep:p256", "dep:sha2"]
 bls12_381 = ["dep:bls12_381_plus", "dep:sha2"]
 bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
-curve25519 = ["dep:vsss-rs", "dep:sha2"]
+ristretto25519 = ["dep:vsss-rs", "dep:sha2"]
+ed25519 = ["curve25519-dalek-ml", "dep:vsss-rs", "dep:sha2"]
 ed448 = ["dep:ed448-goldilocks-plus"]
 p384 = ["dep:p384", "dep:sha2", "dep:elliptic-curve-tools"]
 decaf377 = ["dep:decaf377", "dep:blake2", "dep:elliptic-curve"]

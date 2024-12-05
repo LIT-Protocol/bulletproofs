@@ -38,12 +38,14 @@ pub use crate::range_proof::RangeProof;
 pub use group;
 pub use merlin;
 pub use transcript::TranscriptProtocol;
-#[cfg(any(feature = "curve25519", test))]
-pub use types::curve25519_impls::Curve25519;
 #[cfg(any(feature = "decaf377", test))]
 pub use types::decaf377_impls::Decaf377;
+#[cfg(any(feature = "ed25519", test))]
+pub use types::ed25519_impls::Ed25519;
 #[cfg(any(feature = "jubjub", test))]
 pub use types::jubjub_impls::JubJub;
+#[cfg(any(feature = "ristretto25519", test))]
+pub use types::ristretto25519_impls::Ristretto25519;
 pub use types::{
     BulletproofCurveArithmetic, FromWideBytes, HashToPoint, HashToScalar, PippengerScalar,
     ScalarBatchInvert,
@@ -53,6 +55,8 @@ pub use types::{
 pub use bls12_381_plus;
 #[cfg(feature = "bls12_381_std")]
 pub use blstrs_plus;
+#[cfg(feature = "ed25519")]
+pub use curve25519_dalek_ml;
 #[cfg(feature = "decaf377")]
 pub use decaf377;
 #[cfg(feature = "ed448")]
@@ -65,7 +69,7 @@ pub use k256;
 pub use p256;
 #[cfg(feature = "p384")]
 pub use p384;
-#[cfg(feature = "curve25519")]
+#[cfg(any(feature = "ristretto25519", feature = "ed25519"))]
 pub use vsss_rs;
 
 trait CtOptionOps<T> {

@@ -412,8 +412,8 @@ mod bls12_381_std_impls {
     }
 }
 
-#[cfg(any(feature = "curve25519", test))]
-pub mod curve25519_impls {
+#[cfg(any(feature = "ristretto25519", test))]
+pub mod ristretto25519_impls {
     use super::*;
     use crate::util::read32;
     use vsss_rs::{
@@ -452,9 +452,9 @@ pub mod curve25519_impls {
     impl ScalarBatchInvert for WrappedScalar {}
 
     #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
-    pub struct Curve25519;
+    pub struct Ristretto25519;
 
-    impl BulletproofCurveArithmetic for Curve25519 {
+    impl BulletproofCurveArithmetic for Ristretto25519 {
         type Point = WrappedRistretto;
         type Scalar = WrappedScalar;
 
@@ -484,6 +484,88 @@ pub mod curve25519_impls {
             let scalars = scalars.iter().map(|s| s.0).collect::<Vec<_>>();
             let points = points.iter().map(|p| p.0).collect::<Vec<_>>();
             RistrettoPoint::multiscalar_mul(scalars.iter(), points.iter()).into()
+        }
+    }
+}
+
+#[cfg(any(feature = "ed25519", test))]
+pub mod ed25519_impls {
+    use super::*;
+    use crate::util::read32;
+    use curve25519_dalek_ml::EdwardsPoint;
+    use vsss_rs::curve25519::WrappedEdwards;
+    use vsss_rs::{
+        curve25519::{WrappedRistretto, WrappedScalar},
+        curve25519_dalek::{traits::MultiscalarMul, RistrettoPoint, Scalar},
+    };
+
+    impl HashToScalar for WrappedScalar {
+        type Scalar = WrappedScalar;
+
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            Scalar::hash_from_bytes::<sha2::Sha512>(m).into()
+        }
+    }
+
+    impl HashToPoint for WrappedEdwards {
+        type Point = WrappedEdwards;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            const DST: &[u8] = b"edwards25519_XMD:SHA-512_ELL2_RO_";
+            let pt = EdwardsPoint::hash_to_curve(m, DST);
+            let pt = unsafe { std::mem::transmute(pt) };
+            WrappedEdwards(pt)
+        }
+    }
+
+    impl FromWideBytes for WrappedScalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            Scalar::from_bytes_mod_order_wide(&<[u8; 64]>::try_from(bytes).unwrap()).into()
+        }
+    }
+
+    impl PippengerScalar for WrappedScalar {
+        fn as_pippenger_scalar(&self) -> [u64; 4] {
+            todo!()
+        }
+    }
+
+    impl ScalarBatchInvert for WrappedScalar {}
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Default)]
+    pub struct Ed25519;
+
+    impl BulletproofCurveArithmetic for Ed25519 {
+        type Point = WrappedEdwards;
+        type Scalar = WrappedScalar;
+
+        const POINT_BYTES: usize = 32;
+        const SCALAR_BYTES: usize = 32;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            Option::<WrappedEdwards>::from(WrappedEdwards::from_bytes(&read32(bytes))).ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.0.to_bytes().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            Option::<WrappedScalar>::from(WrappedScalar::from_repr(read32(bytes))).ok_or(())
+        }
+
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
+            let scalars = scalars.iter().map(|s| s.0).collect::<Vec<_>>();
+            let points = points.iter().map(|p| p.0).collect::<Vec<_>>();
+            vsss_rs::curve25519_dalek::EdwardsPoint::multiscalar_mul(scalars.iter(), points.iter())
+                .into()
         }
     }
 }

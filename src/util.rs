@@ -264,7 +264,8 @@ fn sum_of_powers_slow<C: BulletproofCurveArithmetic>(x: &C::Scalar, n: usize) ->
 #[cfg(any(
     feature = "bls12_381",
     feature = "bls12_381_std",
-    feature = "curve25519",
+    feature = "ristretto25519",
+    feature = "ed25519",
     test
 ))]
 /// Given `data` with `len >= 32`, return the first 32 bytes.

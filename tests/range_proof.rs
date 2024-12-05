@@ -10,10 +10,10 @@ use bulletproofs::{BulletproofCurveArithmetic, BulletproofGens, PedersenGens, Ra
 
 use hex;
 
-#[cfg(feature = "curve25519")]
+#[cfg(feature = "ristretto25519")]
 // #[test]
 fn generate_test_vectors_curve25519() {
-    generate_test_vectors::<bulletproofs::Curve25519>();
+    generate_test_vectors::<bulletproofs::Ristretto25519>();
 }
 
 #[cfg(feature = "k256")]
