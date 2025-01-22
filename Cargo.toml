@@ -25,7 +25,7 @@ bls12_381_plus = { version = "0.8", optional = true }
 blstrs_plus = { version = "0.8", optional = true }
 curve25519-dalek-ml = { version = "4.2.2", features = ["group", "group-bits", "zeroize"], optional = true }
 data-encoding = "2.6"
-decaf377 = { version = "0.10", git = "https://github.com/LIT-Protocol/decaf377.git", features = ["serde"],  rev = "5d9abd7da468171a4b1aa5921927115b85cb2af8", optional = true }
+decaf377 = { version = "0.10", git = "https://github.com/LIT-Protocol/decaf377.git", features = ["serde"],  rev = "1c5755b2b90e1969d47ce89cf2d35078984a0ee5", optional = true }
 ed448-goldilocks-plus = { version = "0.13", optional = true }
 elliptic-curve = { version = "0.13.8", default-features = false, features = ["arithmetic", "hash2curve"], optional = true }
 elliptic-curve-tools = { version = "0.1.2", optional = true }
