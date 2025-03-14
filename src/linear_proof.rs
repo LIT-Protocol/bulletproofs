@@ -494,8 +494,8 @@ mod tests {
 
     #[test]
     fn test_linear_proof_base() {
-        #[cfg(feature = "curve25519")]
-        test_helper::<crate::Curve25519>(1);
+        #[cfg(feature = "ed25519")]
+        test_helper::<crate::Ed25519>(1);
         #[cfg(feature = "k256")]
         test_helper::<k256::Secp256k1>(1);
         #[cfg(feature = "p256")]
@@ -508,8 +508,8 @@ mod tests {
 
     #[test]
     fn test_linear_proof_16() {
-        #[cfg(feature = "curve25519")]
-        test_helper::<crate::Curve25519>(16);
+        #[cfg(feature = "ed25519")]
+        test_helper::<crate::Ed25519>(16);
         #[cfg(feature = "k256")]
         test_helper::<k256::Secp256k1>(16);
         #[cfg(feature = "p256")]
@@ -522,8 +522,8 @@ mod tests {
 
     #[test]
     fn test_linear_proof_32() {
-        #[cfg(feature = "curve25519")]
-        test_helper::<crate::Curve25519>(32);
+        #[cfg(feature = "ed25519")]
+        test_helper::<crate::Ed25519>(32);
         #[cfg(feature = "k256")]
         test_helper::<k256::Secp256k1>(32);
         #[cfg(feature = "p256")]
@@ -536,8 +536,8 @@ mod tests {
 
     #[test]
     fn test_linear_proof_64() {
-        #[cfg(feature = "curve25519")]
-        test_helper::<crate::Curve25519>(64);
+        #[cfg(feature = "ed25519")]
+        test_helper::<crate::Ed25519>(64);
         #[cfg(feature = "k256")]
         test_helper::<k256::Secp256k1>(64);
         #[cfg(feature = "p256")]

@@ -287,10 +287,10 @@ mod tests {
     use super::*;
     use crate::types::*;
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn exp_2_is_powers_of_2_curve25519() {
-        exp_2_is_powers_of_2::<crate::Curve25519>()
+        exp_2_is_powers_of_2::<crate::Ed25519>()
     }
 
     #[cfg(feature = "k256")]
@@ -326,10 +326,10 @@ mod tests {
         assert_eq!(exp_2[3], C::Scalar::from(8u64));
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn test_inner_product_curve25519() {
-        test_inner_product::<crate::Curve25519>()
+        test_inner_product::<crate::Ed25519>()
     }
 
     #[cfg(feature = "k256")]
@@ -393,10 +393,10 @@ mod tests {
         assert_eq!(sum_of_powers_slow::<C>(&x, 64), sum_of_powers::<C>(&x, 64));
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn test_sum_of_powers_slow_curve25519() {
-        test_sum_of_powers_slow::<crate::Curve25519>()
+        test_sum_of_powers_slow::<crate::Ed25519>()
     }
 
     #[cfg(feature = "k256")]
@@ -434,10 +434,10 @@ mod tests {
         assert_eq!(sum_of_powers_slow::<C>(&x, 6), C::Scalar::from(111111u64));
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn vec_of_scalars_clear_on_drop_curve25519() {
-        vec_of_scalars_clear_on_drop::<crate::Curve25519>()
+        vec_of_scalars_clear_on_drop::<crate::Ed25519>()
     }
 
     #[cfg(feature = "k256")]
@@ -483,10 +483,10 @@ mod tests {
         assert_eq!(v[1], C::Scalar::ZERO);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn tuple_of_scalars_clear_on_drop_curve25519() {
-        tuple_of_scalars_clear_on_drop::<crate::Curve25519>()
+        tuple_of_scalars_clear_on_drop::<crate::Ed25519>()
     }
 
     #[cfg(feature = "k256")]
@@ -537,10 +537,10 @@ mod tests {
         assert_eq!(v.2, C::Scalar::ZERO);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn batch_invert_curve25519() {
-        batch_invert::<crate::Curve25519>()
+        batch_invert::<crate::Ed25519>()
     }
 
     #[cfg(feature = "k256")]

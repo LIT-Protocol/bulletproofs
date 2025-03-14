@@ -521,8 +521,8 @@ mod tests {
 
     #[test]
     fn make_ipp_1() {
-        #[cfg(feature = "curve25519")]
-        test_helper_create::<crate::Curve25519>(1);
+        #[cfg(feature = "ed25519")]
+        test_helper_create::<crate::Ed25519>(1);
         #[cfg(feature = "k256")]
         test_helper_create::<k256::Secp256k1>(1);
         #[cfg(feature = "p256")]
@@ -535,8 +535,8 @@ mod tests {
 
     #[test]
     fn make_ipp_2() {
-        #[cfg(feature = "curve25519")]
-        test_helper_create::<crate::Curve25519>(2);
+        #[cfg(feature = "ed25519")]
+        test_helper_create::<crate::Ed25519>(2);
         #[cfg(feature = "k256")]
         test_helper_create::<k256::Secp256k1>(2);
         #[cfg(feature = "p256")]
@@ -549,8 +549,8 @@ mod tests {
 
     #[test]
     fn make_ipp_4() {
-        #[cfg(feature = "curve25519")]
-        test_helper_create::<crate::Curve25519>(4);
+        #[cfg(feature = "ed25519")]
+        test_helper_create::<crate::Ed25519>(4);
         #[cfg(feature = "k256")]
         test_helper_create::<k256::Secp256k1>(4);
         #[cfg(feature = "p256")]
@@ -563,8 +563,8 @@ mod tests {
 
     #[test]
     fn make_ipp_32() {
-        #[cfg(feature = "curve25519")]
-        test_helper_create::<crate::Curve25519>(32);
+        #[cfg(feature = "ed25519")]
+        test_helper_create::<crate::Ed25519>(32);
         #[cfg(feature = "k256")]
         test_helper_create::<k256::Secp256k1>(32);
         #[cfg(feature = "p256")]
@@ -577,8 +577,8 @@ mod tests {
 
     #[test]
     fn make_ipp_64() {
-        #[cfg(feature = "curve25519")]
-        test_helper_create::<crate::Curve25519>(64);
+        #[cfg(feature = "ed25519")]
+        test_helper_create::<crate::Ed25519>(64);
         #[cfg(feature = "k256")]
         test_helper_create::<k256::Secp256k1>(64);
         #[cfg(feature = "p256")]
@@ -589,10 +589,10 @@ mod tests {
         test_helper_create::<blstrs_plus::Bls12381G1>(64);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn test_inner_product_curve25519() {
-        test_inner_product::<crate::Curve25519>();
+        test_inner_product::<crate::Ed25519>();
     }
 
     #[cfg(feature = "k256")]

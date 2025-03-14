@@ -38,13 +38,13 @@ pub use crate::range_proof::RangeProof;
 pub use group;
 pub use merlin;
 pub use transcript::TranscriptProtocol;
-#[cfg(any(feature = "decaf377", test))]
+#[cfg(feature = "decaf377")]
 pub use types::decaf377_impls::Decaf377;
-#[cfg(any(feature = "ed25519", test))]
+#[cfg(feature = "ed25519")]
 pub use types::ed25519_impls::Ed25519;
-#[cfg(any(feature = "jubjub", test))]
+#[cfg(feature = "jubjub")]
 pub use types::jubjub_impls::JubJub;
-#[cfg(any(feature = "ristretto25519", test))]
+#[cfg(feature = "ristretto25519")]
 pub use types::ristretto25519_impls::Ristretto25519;
 pub use types::{
     BulletproofCurveArithmetic, FromWideBytes, HashToPoint, HashToScalar, PippengerScalar,

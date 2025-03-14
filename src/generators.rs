@@ -288,10 +288,10 @@ impl<'a, C: BulletproofCurveArithmetic> BulletproofGensShare<'a, C> {
 mod tests {
     use super::*;
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn aggregated_gens_iter_matches_flat_map_curve25519() {
-        aggregated_gens_iter_matches_flat_map::<crate::Curve25519>();
+        aggregated_gens_iter_matches_flat_map::<crate::Ed25519>();
     }
 
     #[cfg(feature = "k256")]
@@ -358,10 +358,10 @@ mod tests {
         helper(16, 1);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn resizing_small_gens_matches_creating_bigger_gens_curve25519() {
-        resizing_small_gens_matches_creating_bigger_gens::<crate::Curve25519>();
+        resizing_small_gens_matches_creating_bigger_gens::<crate::Ed25519>();
     }
 
     #[cfg(feature = "k256")]

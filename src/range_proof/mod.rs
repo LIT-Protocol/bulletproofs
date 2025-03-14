@@ -96,30 +96,30 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     /// use rand::thread_rng;
     /// use group::ff::Field;
     /// use merlin::Transcript;
-    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof, Curve25519};
+    /// use bulletproofs::{BulletproofGens, PedersenGens, RangeProof, Ed25519};
     ///
     /// fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
     /// // independently of the Bulletproofs generators.
     /// use bulletproofs::BulletproofCurveArithmetic;
-    /// let pc_gens = PedersenGens::<Curve25519>::default();
+    /// let pc_gens = PedersenGens::<Ed25519>::default();
     ///
     /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
     /// // and aggregation size up to 1.
-    /// let bp_gens = BulletproofGens::<Curve25519>::new(64, 1);
+    /// let bp_gens = BulletproofGens::<Ed25519>::new(64, 1);
     ///
     /// // A secret value we want to prove lies in the range [0, 2^32)
     /// let secret_value = 1037578891u64;
     ///
     /// // The API takes a blinding factor for the commitment.
-    /// let blinding = <Curve25519 as BulletproofCurveArithmetic>::Scalar::random(&mut thread_rng());
+    /// let blinding = <Ed25519 as BulletproofCurveArithmetic>::Scalar::random(&mut thread_rng());
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
     /// let mut prover_transcript = Transcript::new(b"doctest example");
     ///
     /// // Create a 32-bit rangeproof.
-    /// let (proof, committed_value) = RangeProof::<Curve25519>::prove_single(
+    /// let (proof, committed_value) = RangeProof::<Ed25519>::prove_single(
     ///     &bp_gens,
     ///     &pc_gens,
     ///     &mut prover_transcript,
@@ -186,26 +186,28 @@ impl<C: BulletproofCurveArithmetic> RangeProof<C> {
     ///
     /// # Example
     /// ```
+    /// # #[cfg(feature = "ed25519")]
+    /// # {
     /// use rand::thread_rng;
     /// use group::ff::Field;
     /// use merlin::Transcript;
-    /// use bulletproofs::{BulletproofGens, Curve25519, PedersenGens, RangeProof};
+    /// use bulletproofs::{BulletproofGens, Ed25519, PedersenGens, RangeProof};
     ///
     /// # fn main() {
     /// // Generators for Pedersen commitments.  These can be selected
     /// // independently of the Bulletproofs generators.
     /// use bulletproofs::BulletproofCurveArithmetic;
-    /// let pc_gens = PedersenGens::<Curve25519>::default();
+    /// let pc_gens = PedersenGens::<Ed25519>::default();
     ///
     /// // Generators for Bulletproofs, valid for proofs up to bitsize 64
     /// // and aggregation size up to 16.
-    /// let bp_gens = BulletproofGens::<Curve25519>::new(64, 16);
+    /// let bp_gens = BulletproofGens::<Ed25519>::new(64, 16);
     ///
     /// // Four secret values we want to prove lie in the range [0, 2^32)
     /// let secrets = [4242344947u64, 3718732727u64, 2255562556u64, 2526146994u64];
     ///
     /// // The API takes blinding factors for the commitments.
-    /// let blindings: Vec<_> = (0..4).map(|_| <Curve25519 as BulletproofCurveArithmetic>::Scalar::random(&mut thread_rng())).collect();
+    /// let blindings: Vec<_> = (0..4).map(|_| <Ed25519 as BulletproofCurveArithmetic>::Scalar::random(&mut thread_rng())).collect();
     ///
     /// // The proof can be chained to an existing transcript.
     /// // Here we create a transcript with a doctest domain separator.
@@ -616,10 +618,10 @@ mod tests {
 
     use crate::generators::PedersenGens;
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn test_delta_curve25519() {
-        test_delta::<crate::Curve25519>();
+        test_delta::<crate::Ed25519>();
     }
 
     #[cfg(feature = "k256")]
@@ -730,10 +732,10 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_32_m_1_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 1);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(32, 1);
     }
 
     #[cfg(feature = "k256")]
@@ -760,10 +762,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 1);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_32_m_2_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 2);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(32, 2);
     }
 
     #[cfg(feature = "k256")]
@@ -790,10 +792,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 2);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_32_m_4_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 4);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(32, 4);
     }
 
     #[cfg(feature = "k256")]
@@ -820,10 +822,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 4);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_32_m_8_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(32, 8);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(32, 8);
     }
 
     #[cfg(feature = "k256")]
@@ -850,10 +852,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(32, 8);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_64_m_1_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 1);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(64, 1);
     }
 
     #[cfg(feature = "k256")]
@@ -880,10 +882,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 1);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_64_m_2_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 2);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(64, 2);
     }
 
     #[cfg(feature = "k256")]
@@ -910,10 +912,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 2);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_64_m_4_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 4);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(64, 4);
     }
 
     #[cfg(feature = "k256")]
@@ -940,10 +942,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 4);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn create_and_verify_n_64_m_8_curve25519() {
-        singleparty_create_and_verify_helper::<crate::Curve25519>(64, 8);
+        singleparty_create_and_verify_helper::<crate::Ed25519>(64, 8);
     }
 
     #[cfg(feature = "k256")]
@@ -970,10 +972,10 @@ mod tests {
         singleparty_create_and_verify_helper::<blstrs_plus::Bls12381G1>(64, 8);
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn detect_dishonest_party_during_aggregation_curve25519() {
-        detect_dishonest_party_during_aggregation::<crate::Curve25519>();
+        detect_dishonest_party_during_aggregation::<crate::Ed25519>();
     }
 
     #[cfg(feature = "k256")]
@@ -1073,10 +1075,10 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "curve25519")]
+    #[cfg(feature = "ed25519")]
     #[test]
     fn detect_dishonest_dealer_during_aggregation_curve25519() {
-        detect_dishonest_dealer_during_aggregation::<crate::Curve25519>();
+        detect_dishonest_dealer_during_aggregation::<crate::Ed25519>();
     }
 
     #[cfg(feature = "k256")]

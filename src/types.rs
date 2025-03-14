@@ -412,7 +412,7 @@ mod bls12_381_std_impls {
     }
 }
 
-#[cfg(any(feature = "ristretto25519", test))]
+#[cfg(feature = "ristretto25519")]
 pub mod ristretto25519_impls {
     use super::*;
     use crate::util::read32;
@@ -488,7 +488,7 @@ pub mod ristretto25519_impls {
     }
 }
 
-#[cfg(any(feature = "ed25519", test))]
+#[cfg(feature = "ed25519")]
 pub mod ed25519_impls {
     use super::*;
     use crate::util::read32;
