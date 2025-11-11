@@ -20,29 +20,30 @@ edition = "2021"
 
 [dependencies]
 blake2 = { version = "0.10", optional = true }
-group = "0.13"
+byteorder = { version = "1", default-features = false }
 bls12_381_plus = { version = "0.8", optional = true }
 blstrs_plus = { version = "0.8", optional = true }
 curve25519-dalek-ml = { version = "4.3.0", features = ["group", "group-bits", "zeroize"], optional = true }
-data-encoding = "2.6"
+data-encoding = "2.9"
 decaf377 = { version = "0.10", git = "https://github.com/LIT-Protocol/decaf377.git", features = ["serde"],  rev = "1c5755b2b90e1969d47ce89cf2d35078984a0ee5", optional = true }
+digest = { version = "0.10", default-features = false }
 ed448-goldilocks-plus = { version = "0.16", optional = true }
 elliptic-curve = { version = "0.13.8", default-features = false, features = ["arithmetic", "hash2curve"], optional = true }
 elliptic-curve-tools = { version = "0.1.2", optional = true }
+group = "0.13"
 jubjub-plus = { version = "0.10", optional = true }
 k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
+merlin = { version = "3", default-features = false }
 p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 p384 = { version = "0.13", features = ["arithmetic", "bits", "hash2curve"], optional = true }
+pasta_curves = { version = "0.5.1", git = "https://github.com/LIT-Protocol/pasta_curves.git", features=["alloc", "serde"], optional = true }
+rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
+rand = { version = "0.8", default-features = false, optional = true }
 subtle = { version = "2.6", default-features = false }
 sha2 = { version = "0.10", default-features = false, optional = true }
 sha3 = { version = "0.10", default-features = false }
-digest = { version = "0.10", default-features = false }
-rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
-rand = { version = "0.8", default-features = false, optional = true }
-byteorder = { version = "1", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
 thiserror = { version = "2", optional = true }
-merlin = { version = "3", default-features = false }
 vsss-rs = { version = "5.0.0", features = ["curve25519"], optional = true }
 zeroize = "1"
 
@@ -69,6 +70,7 @@ ed448 = ["dep:ed448-goldilocks-plus"]
 p384 = ["dep:p384", "dep:sha2", "dep:elliptic-curve-tools"]
 decaf377 = ["dep:decaf377", "dep:blake2", "dep:elliptic-curve"]
 jubjub = ["dep:jubjub-plus", "dep:blake2", "dep:elliptic-curve", "dep:elliptic-curve-tools"]
+pasta = ["dep:pasta_curves", "dep:blake2", "dep:elliptic-curve", "dep:elliptic-curve-tools"]
 
 [package.metadata."docs.rs"]
 all-features = true

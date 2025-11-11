@@ -898,6 +898,155 @@ pub mod jubjub_impls {
     }
 }
 
+#[cfg(feature = "pasta")]
+pub mod pasta_impls {
+    use super::*;
+    use elliptic_curve::{group::GroupEncoding, hash2curve::ExpandMsgXmd, PrimeField};
+    use elliptic_curve_tools::SumOfProducts;
+    use pasta::{
+        arithmetic::CurveExt,
+        pallas::{Pallas, Point as PallasPoint, Scalar as PallasScalar},
+        vesta::{Point as VestaPoint, Scalar as VestaScalar, Vesta},
+    };
+    use pasta_curves as pasta;
+
+    impl HashToScalar for PallasScalar {
+        type Scalar = PallasScalar;
+
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            const DST: &'static [u8] = b"Pallas_XMD:BLAKE2b-512";
+            PallasScalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, DST)
+        }
+    }
+
+    impl HashToPoint for PallasPoint {
+        type Point = PallasPoint;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            const DST: &'static str = "Pallas_XMD:BLAKE2b-512_RO_";
+            let hash = PallasPoint::hash_to_curve(DST);
+            hash(m)
+        }
+    }
+
+    impl FromWideBytes for PallasScalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            let repr = bytes.try_into().expect("64 bytes");
+            PallasScalar::from_bytes_wide(&repr)
+        }
+    }
+
+    impl ScalarBatchInvert for PallasScalar {}
+
+    impl BulletproofCurveArithmetic for Pallas {
+        type Point = PallasPoint;
+        type Scalar = PallasScalar;
+
+        const POINT_BYTES: usize = 32;
+        const SCALAR_BYTES: usize = 32;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            let mut repr = <PallasPoint as GroupEncoding>::Repr::default();
+            repr.copy_from_slice(bytes);
+            Option::<PallasPoint>::from(PallasPoint::from_bytes(&repr)).ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.to_repr().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            let mut repr = <PallasScalar as PrimeField>::Repr::default();
+            repr.copy_from_slice(bytes);
+            Option::<PallasScalar>::from(PallasScalar::from_repr(repr)).ok_or(())
+        }
+
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
+            let grouped = scalars
+                .iter()
+                .zip(points.iter())
+                .map(|(s, p)| (*s, *p))
+                .collect::<Vec<(PallasScalar, PallasPoint)>>();
+            PallasPoint::sum_of_products(&grouped)
+        }
+    }
+
+    impl HashToScalar for VestaScalar {
+        type Scalar = VestaScalar;
+
+        fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
+            const DST: &'static [u8] = b"Vesta_XMD:BLAKE2b-512";
+            VestaScalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, &DST)
+        }
+    }
+
+    impl HashToPoint for VestaPoint {
+        type Point = VestaPoint;
+
+        fn hash_to_point(m: &[u8]) -> Self::Point {
+            const DST: &'static str = "Vesta_XMD:BLAKE2b-512_RO_";
+            let hash = VestaPoint::hash_to_curve(DST);
+            hash(m)
+        }
+    }
+
+    impl FromWideBytes for VestaScalar {
+        fn from_wide_bytes(bytes: &[u8]) -> Self {
+            let repr = bytes.try_into().expect("64 bytes");
+            VestaScalar::from_bytes_wide(&repr)
+        }
+    }
+
+    impl ScalarBatchInvert for VestaScalar {}
+
+    impl BulletproofCurveArithmetic for Vesta {
+        type Point = VestaPoint;
+        type Scalar = VestaScalar;
+
+        const POINT_BYTES: usize = 32;
+        const SCALAR_BYTES: usize = 32;
+
+        fn serialize_point(p: &Self::Point) -> Vec<u8> {
+            p.to_bytes().to_vec()
+        }
+
+        fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
+            let mut repr = <VestaPoint as GroupEncoding>::Repr::default();
+            repr.copy_from_slice(bytes);
+            Option::<VestaPoint>::from(VestaPoint::from_bytes(&repr)).ok_or(())
+        }
+
+        fn serialize_scalar(s: &Self::Scalar) -> Vec<u8> {
+            s.to_repr().to_vec()
+        }
+
+        fn deserialize_scalar(bytes: &[u8]) -> Result<Self::Scalar, ()> {
+            let mut repr = <VestaScalar as PrimeField>::Repr::default();
+            repr.copy_from_slice(bytes);
+            Option::<VestaScalar>::from(VestaScalar::from_repr(repr)).ok_or(())
+        }
+
+        fn pippenger_sum_of_products(
+            points: &[Self::Point],
+            scalars: &[Self::Scalar],
+        ) -> Self::Point {
+            let grouped = scalars
+                .iter()
+                .zip(points.iter())
+                .map(|(s, p)| (*s, *p))
+                .collect::<Vec<(VestaScalar, VestaPoint)>>();
+            VestaPoint::sum_of_products(&grouped)
+        }
+    }
+}
+
 #[cfg(any(feature = "k256", feature = "p256"))]
 fn sum_of_products_pippenger<P, S>(points: &[P], scalars: &[S]) -> P
 where

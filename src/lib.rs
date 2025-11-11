@@ -69,6 +69,8 @@ pub use k256;
 pub use p256;
 #[cfg(feature = "p384")]
 pub use p384;
+#[cfg(feature = "pasta")]
+pub use pasta_curves as pasta;
 #[cfg(any(feature = "ristretto25519", feature = "ed25519"))]
 pub use vsss_rs;
 
