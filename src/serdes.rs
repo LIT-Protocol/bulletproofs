@@ -2,11 +2,11 @@ use core::{
     fmt::{self, Formatter},
     marker::PhantomData,
 };
-use group::Group;
+use lit_rust_crypto::group::Group;
 use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{SeqAccess, Visitor},
     ser::SerializeTuple,
-    Deserialize, Deserializer, Serialize, Serializer,
 };
 
 use crate::BulletproofCurveArithmetic;

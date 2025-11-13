@@ -35,7 +35,6 @@ pub use crate::errors::ProofError;
 pub use crate::generators::{BulletproofGens, BulletproofGensShare, PedersenGens};
 pub use crate::linear_proof::LinearProof;
 pub use crate::range_proof::RangeProof;
-pub use group;
 pub use merlin;
 pub use transcript::TranscriptProtocol;
 #[cfg(feature = "decaf377")]
@@ -51,28 +50,7 @@ pub use types::{
     ScalarBatchInvert,
 };
 
-#[cfg(feature = "bls12_381")]
-pub use bls12_381_plus;
-#[cfg(feature = "bls12_381_std")]
-pub use blstrs_plus;
-#[cfg(feature = "ed25519")]
-pub use curve25519_dalek_ml;
-#[cfg(feature = "decaf377")]
-pub use decaf377;
-#[cfg(feature = "ed448")]
-pub use ed448_goldilocks_plus as ed448;
-#[cfg(feature = "jubjub")]
-pub use jubjub_plus as jubjub;
-#[cfg(feature = "k256")]
-pub use k256;
-#[cfg(feature = "p256")]
-pub use p256;
-#[cfg(feature = "p384")]
-pub use p384;
-#[cfg(feature = "pasta")]
-pub use pasta_curves as pasta;
-#[cfg(any(feature = "ristretto25519", feature = "ed25519"))]
-pub use vsss_rs;
+pub use lit_rust_crypto;
 
 trait CtOptionOps<T> {
     fn ok_or<E>(self, err: E) -> Result<T, E>;

@@ -16,27 +16,15 @@ repository = "https://github.com/LIT-protocol/bulletproofs"
 categories = ["cryptography"]
 keywords = ["cryptography", "crypto", "zero-knowledge", "bulletproofs"]
 description = "A pure-Rust implementation of Bulletproofs"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 blake2 = { version = "0.10", optional = true }
 byteorder = { version = "1", default-features = false }
-bls12_381_plus = { version = "0.8", optional = true }
-blstrs_plus = { version = "0.8", optional = true }
-curve25519-dalek-ml = { version = "4.3.0", features = ["group", "group-bits", "zeroize"], optional = true }
 data-encoding = "2.9"
-decaf377 = { version = "0.10", git = "https://github.com/LIT-Protocol/decaf377.git", features = ["serde"],  rev = "b2f76eda2e56bbaa818196d7c2d795312bbfbd92", optional = true }
 digest = { version = "0.10", default-features = false }
-ed448-goldilocks-plus = { version = "0.16", optional = true }
-elliptic-curve = { version = "0.13.8", default-features = false, features = ["arithmetic", "hash2curve"], optional = true }
 elliptic-curve-tools = { version = "0.1.2", optional = true }
-group = "0.13"
-jubjub-plus = { version = "0.10", optional = true }
-k256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
 merlin = { version = "3", default-features = false }
-p256 = { version = "0.13", features = ["arithmetic", "hash2curve"], optional = true }
-p384 = { version = "0.13", features = ["arithmetic", "bits", "hash2curve"], optional = true }
-pasta_curves = { version = "0.5.1", git = "https://github.com/LIT-Protocol/pasta_curves.git", features=["alloc", "serde"], optional = true }
 rand_core = { version = "0.6", default-features = false, features = ["alloc"] }
 rand = { version = "0.8", default-features = false, optional = true }
 subtle = { version = "2.6", default-features = false }
@@ -44,12 +32,22 @@ sha2 = { version = "0.10", default-features = false, optional = true }
 sha3 = { version = "0.10", default-features = false }
 serde = { version = "1", default-features = false, features = ["alloc", "serde_derive"] }
 thiserror = { version = "2", optional = true }
-vsss-rs = { version = "5.0.0", features = ["curve25519"], optional = true }
 zeroize = "1"
+
+[dependencies.lit-rust-crypto]
+git = "https://github.com/LIT-Protocol/lit-rust-crypto"
+tag = "0.5.0"
+features = [
+    "arithmetic",
+    "bits",
+    "hash2curve",
+    "serde",
+    "zeroize",
+]
 
 [dev-dependencies]
 hex = "0.4"
-criterion = "0.5"
+criterion = "0.7"
 bincode = "1"
 rand_chacha = "0.3"
 sha2 = "0.10"
@@ -60,17 +58,17 @@ yoloproofs = []
 std = ["rand", "rand/std", "rand/std_rng", "thiserror"]
 nightly = ["subtle/nightly"]
 docs = ["nightly"]
-k256 = ["dep:k256", "dep:sha2"]
-p256 = ["dep:p256", "dep:sha2"]
-bls12_381 = ["dep:bls12_381_plus", "dep:sha2"]
-bls12_381_std = ["dep:blstrs_plus", "dep:sha2"]
-ristretto25519 = ["dep:vsss-rs", "dep:sha2"]
-ed25519 = ["curve25519-dalek-ml", "dep:vsss-rs", "dep:sha2", "dep:elliptic-curve"]
-ed448 = ["dep:ed448-goldilocks-plus"]
-p384 = ["dep:p384", "dep:sha2", "dep:elliptic-curve-tools"]
-decaf377 = ["dep:decaf377", "dep:blake2", "dep:elliptic-curve"]
-jubjub = ["dep:jubjub-plus", "dep:blake2", "dep:elliptic-curve", "dep:elliptic-curve-tools"]
-pasta = ["dep:pasta_curves", "dep:blake2", "dep:elliptic-curve", "dep:elliptic-curve-tools"]
+k256 = ["lit-rust-crypto/k256-default", "dep:sha2"]
+p256 = ["lit-rust-crypto/p256-default", "dep:sha2"]
+bls12_381 = ["lit-rust-crypto/bls12-381-plus-default", "dep:sha2"]
+bls12_381_std = ["lit-rust-crypto/blstrs_plus", "dep:sha2"]
+ristretto25519 = ["lit-rust-crypto/vsss-rs-default", "dep:sha2"]
+ed25519 = ["lit-rust-crypto/curve25519-dalek-default", "lit-rust-crypto/vsss-rs-default", "dep:sha2"]
+ed448 = ["lit-rust-crypto/ed448-goldilocks-default"]
+p384 = ["lit-rust-crypto/p384-default", "dep:sha2", "dep:elliptic-curve-tools"]
+decaf377 = ["lit-rust-crypto/decaf377-default", "dep:blake2"]
+jubjub = ["lit-rust-crypto/jubjub-default", "dep:blake2", "dep:elliptic-curve-tools"]
+pasta = ["lit-rust-crypto/pasta-default", "dep:blake2", "dep:elliptic-curve-tools"]
 
 [package.metadata."docs.rs"]
 all-features = true

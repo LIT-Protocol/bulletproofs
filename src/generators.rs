@@ -8,7 +8,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use digest::{ExtendableOutput, Update, XofReader};
-use group::{Group, GroupEncoding};
+use lit_rust_crypto::group::{Group, GroupEncoding};
 use sha3::{Shake256, Shake256Reader};
 
 use crate::types::*;

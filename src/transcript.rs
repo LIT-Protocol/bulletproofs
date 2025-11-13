@@ -1,8 +1,8 @@
 //! Defines a `TranscriptProtocol` trait for using a Merlin transcript.
 
 use crate::types::{BulletproofCurveArithmetic, FromWideBytes};
-use group::ff::PrimeField;
-use group::Group;
+use lit_rust_crypto::ff::PrimeField;
+use lit_rust_crypto::group::Group;
 use merlin::Transcript;
 
 use crate::errors::ProofError;

@@ -1,5 +1,8 @@
 use core::fmt::Debug;
-use group::{ff::PrimeField, Group, GroupEncoding};
+use lit_rust_crypto::{
+    ff::PrimeField,
+    group::{Group, GroupEncoding},
+};
 use subtle::{ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroize;
 
@@ -80,15 +83,15 @@ pub trait BulletproofCurveArithmetic: Copy + Clone + Debug {
 #[cfg(feature = "k256")]
 mod k256_impls {
     use super::*;
-    use k256::elliptic_curve::ScalarPrimitive;
-    use k256::{
+    use lit_rust_crypto::{
         elliptic_curve::{
+            ScalarPrimitive,
             bigint::U512,
             hash2curve::{ExpandMsgXmd, GroupDigest},
             ops::Reduce,
             sec1::FromEncodedPoint,
         },
-        ProjectivePoint, Scalar, Secp256k1,
+        k256::{EncodedPoint, ProjectivePoint, Scalar, Secp256k1, WideBytes},
     };
 
     const DST: &[u8] = b"secp256k1_XMD:SHA-256_SSWU_RO_";
@@ -111,7 +114,7 @@ mod k256_impls {
 
     impl FromWideBytes for Scalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            let mut repr = k256::WideBytes::clone_from_slice(bytes);
+            let mut repr = WideBytes::clone_from_slice(bytes);
             repr.copy_from_slice(bytes);
             <Scalar as Reduce<U512>>::reduce_bytes(&repr)
         }
@@ -146,7 +149,7 @@ mod k256_impls {
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
-            let encoded_point = k256::EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
+            let encoded_point = EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
             Option::<ProjectivePoint>::from(ProjectivePoint::from_encoded_point(&encoded_point))
                 .ok_or(())
         }
@@ -172,15 +175,15 @@ mod k256_impls {
 #[cfg(feature = "p256")]
 mod p256_impls {
     use super::*;
-    use p256::elliptic_curve::sec1::FromEncodedPoint;
-    use p256::elliptic_curve::ScalarPrimitive;
-    use p256::{
+    use lit_rust_crypto::{
         elliptic_curve::{
+            ScalarPrimitive,
             bigint::{NonZero, U512},
             hash2curve::{ExpandMsgXmd, GroupDigest},
             scalar::FromUintUnchecked,
+            sec1::FromEncodedPoint,
         },
-        NistP256, ProjectivePoint, Scalar,
+        p256::{EncodedPoint, NistP256, ProjectivePoint, Scalar},
     };
 
     const DST: &[u8] = b"P256_XMD:SHA-256_SSWU_RO_";
@@ -203,7 +206,9 @@ mod p256_impls {
 
     impl FromWideBytes for Scalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            const WIDE_MODULUS: NonZero<U512> = NonZero::from_uint(U512::from_be_hex("0000000000000000000000000000000000000000000000000000000000000000ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"));
+            const WIDE_MODULUS: NonZero<U512> = NonZero::from_uint(U512::from_be_hex(
+                "0000000000000000000000000000000000000000000000000000000000000000ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551",
+            ));
             let mut num = U512::from_be_slice(bytes);
             num %= WIDE_MODULUS;
 
@@ -241,7 +246,7 @@ mod p256_impls {
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
-            let encoded_point = p256::EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
+            let encoded_point = EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
             Option::<ProjectivePoint>::from(ProjectivePoint::from_encoded_point(&encoded_point))
                 .ok_or(())
         }
@@ -268,8 +273,10 @@ mod p256_impls {
 mod bls12_381_impls {
     use super::*;
     use crate::util::{read32, read48};
-    use bls12_381_plus::elliptic_curve::hash2curve::ExpandMsgXmd;
-    use bls12_381_plus::{Bls12381G1, G1Affine, G1Projective, Scalar};
+    use lit_rust_crypto::{
+        bls12_381_plus::{Bls12381G1, G1Affine, G1Projective, Scalar},
+        hash2curve::ExpandMsgXmd,
+    };
 
     const DST: &[u8] = b"BLS12381G1_XMD:SHA-256_SSWU_RO_";
 
@@ -333,7 +340,7 @@ mod bls12_381_impls {
             points: &[Self::Point],
             scalars: &[Self::Scalar],
         ) -> Self::Point {
-            G1Projective::sum_of_products(&points, &scalars)
+            G1Projective::sum_of_products(points, scalars)
         }
     }
 }
@@ -342,8 +349,10 @@ mod bls12_381_impls {
 mod bls12_381_std_impls {
     use super::*;
     use crate::util::{read32, read48};
-    use blstrs_plus::elliptic_curve::hash2curve::ExpandMsgXmd;
-    use blstrs_plus::{Bls12381G1, G1Affine, G1Projective, Scalar};
+    use lit_rust_crypto::{
+        blstrs_plus::{Bls12381G1, G1Affine, G1Projective, Scalar},
+        hash2curve::ExpandMsgXmd,
+    };
 
     const DST: &[u8] = b"BLS12381G1_XMD:SHA-256_SSWU_RO_";
 
@@ -407,7 +416,7 @@ mod bls12_381_std_impls {
             points: &[Self::Point],
             scalars: &[Self::Scalar],
         ) -> Self::Point {
-            G1Projective::sum_of_products(&points, &scalars)
+            G1Projective::sum_of_products(points, scalars)
         }
     }
 }
@@ -416,9 +425,9 @@ mod bls12_381_std_impls {
 pub mod ristretto25519_impls {
     use super::*;
     use crate::util::read32;
-    use vsss_rs::{
+    use lit_rust_crypto::{
         curve25519::{WrappedRistretto, WrappedScalar},
-        curve25519_dalek::{traits::MultiscalarMul, RistrettoPoint, Scalar},
+        vsss_rs::curve25519_dalek::{RistrettoPoint, Scalar, traits::MultiscalarMul},
     };
 
     impl HashToScalar for WrappedScalar {
@@ -492,17 +501,20 @@ pub mod ristretto25519_impls {
 pub mod ed25519_impls {
     use super::*;
     use crate::util::read32;
-    use curve25519_dalek_ml::EdwardsPoint;
-    use elliptic_curve::hash2curve::ExpandMsgXmd;
-    use vsss_rs::curve25519::WrappedEdwards;
-    use vsss_rs::{curve25519::WrappedScalar, curve25519_dalek::traits::MultiscalarMul};
+    use lit_rust_crypto::{
+        curve25519::{WrappedEdwards, WrappedScalar},
+        curve25519_dalek::EdwardsPoint,
+        hash2curve::ExpandMsgXmd,
+        vsss_rs::curve25519_dalek::traits::MultiscalarMul,
+    };
 
     #[cfg(not(feature = "ristretto25519"))]
     impl HashToScalar for WrappedScalar {
         type Scalar = WrappedScalar;
 
         fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
-            vsss_rs::curve25519_dalek::Scalar::hash_from_bytes::<sha2::Sha512>(m).into()
+            lit_rust_crypto::vsss_rs::curve25519_dalek::Scalar::hash_from_bytes::<sha2::Sha512>(m)
+                .into()
         }
     }
 
@@ -520,7 +532,7 @@ pub mod ed25519_impls {
     #[cfg(not(feature = "ristretto25519"))]
     impl FromWideBytes for WrappedScalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            vsss_rs::curve25519_dalek::Scalar::from_bytes_mod_order_wide(
+            lit_rust_crypto::curve25519_dalek::Scalar::from_bytes_mod_order_wide(
                 &<[u8; 64]>::try_from(bytes).unwrap(),
             )
             .into()
@@ -569,8 +581,11 @@ pub mod ed25519_impls {
         ) -> Self::Point {
             let scalars = scalars.iter().map(|s| s.0).collect::<Vec<_>>();
             let points = points.iter().map(|p| p.0).collect::<Vec<_>>();
-            vsss_rs::curve25519_dalek::EdwardsPoint::multiscalar_mul(scalars.iter(), points.iter())
-                .into()
+            lit_rust_crypto::vsss_rs::curve25519_dalek::EdwardsPoint::multiscalar_mul(
+                scalars.iter(),
+                points.iter(),
+            )
+            .into()
         }
     }
 }
@@ -580,14 +595,14 @@ mod p384_impls {
     use super::*;
 
     use elliptic_curve_tools::SumOfProducts;
-    use p384::{
+    use lit_rust_crypto::{
         elliptic_curve::{
             bigint::{NonZero, U768},
             hash2curve::{ExpandMsgXmd, GroupDigest},
             scalar::FromUintUnchecked,
             sec1::FromEncodedPoint,
         },
-        NistP384, ProjectivePoint, Scalar,
+        p384::{EncodedPoint, NistP384, ProjectivePoint, Scalar},
     };
 
     const DST: &[u8] = b"P384_XMD:SHA-256_SSWU_RO_";
@@ -610,7 +625,9 @@ mod p384_impls {
 
     impl FromWideBytes for Scalar {
         fn from_wide_bytes(bytes: &[u8]) -> Self {
-            const WIDE_MODULUS: NonZero<U768> = NonZero::from_uint(U768::from_be_hex("000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973"));
+            const WIDE_MODULUS: NonZero<U768> = NonZero::from_uint(U768::from_be_hex(
+                "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ffffffffffffffffffffffffffffffffffffffffffffffffc7634d81f4372ddf581a0db248b0a77aecec196accc52973",
+            ));
             let mut num = U768::from_be_slice(bytes);
             num %= WIDE_MODULUS;
 
@@ -633,7 +650,7 @@ mod p384_impls {
         }
 
         fn deserialize_point(bytes: &[u8]) -> Result<Self::Point, ()> {
-            let encoded_point = p384::EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
+            let encoded_point = EncodedPoint::from_bytes(bytes).map_err(|_| ())?;
             Option::<ProjectivePoint>::from(ProjectivePoint::from_encoded_point(&encoded_point))
                 .ok_or(())
         }
@@ -664,11 +681,11 @@ mod p384_impls {
 #[cfg(feature = "ed448")]
 mod ed448_impls {
     use super::*;
-    use ed448_goldilocks_plus::{
-        elliptic_curve::hash2curve::ExpandMsgXof, Ed448, EdwardsPoint, Scalar, ScalarBytes,
-        WideScalarBytes,
-    };
     use elliptic_curve_tools::SumOfProducts;
+    use lit_rust_crypto::{
+        ed448_goldilocks::{Ed448, EdwardsPoint, Scalar, ScalarBytes, WideScalarBytes},
+        hash2curve::ExpandMsgXof,
+    };
 
     const SCALAR_DST: &[u8] = b"curve448_XOF:SHAKE256_RO_";
     const EDWARDS_DST: &[u8] = b"edwards448_XOF:SHAKE256_ELL2_RO_";
@@ -742,8 +759,8 @@ mod ed448_impls {
 pub mod decaf377_impls {
     use super::*;
     use blake2::{Blake2b512, Digest};
-    use decaf377::{Element as ProjectivePoint, Fq, Fr as Scalar};
-    use elliptic_curve::{
+    use lit_rust_crypto::{
+        decaf377::{Element as ProjectivePoint, Fq, Fr as Scalar},
         group::GroupEncoding,
         hash2curve::{ExpandMsg, ExpandMsgXmd, Expander},
     };
@@ -824,16 +841,19 @@ pub mod decaf377_impls {
 #[cfg(feature = "jubjub")]
 pub mod jubjub_impls {
     use super::*;
-    use elliptic_curve::{group::GroupEncoding, hash2curve::ExpandMsgXmd};
     use elliptic_curve_tools::SumOfProducts;
-    use jubjub_plus::{ExtendedPoint, Scalar, SubgroupPoint};
+    use lit_rust_crypto::{
+        group::GroupEncoding,
+        hash2curve::ExpandMsgXmd,
+        jubjub::{ExtendedPoint, Scalar, SubgroupPoint},
+    };
 
     impl HashToScalar for Scalar {
         type Scalar = Scalar;
 
         fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
             const DST: &'static [u8] = b"JubJub_XMD:BLAKE2b-512";
-            Scalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, &DST)
+            Scalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, DST)
         }
     }
 
@@ -842,7 +862,7 @@ pub mod jubjub_impls {
 
         fn hash_to_point(m: &[u8]) -> Self::Point {
             const DST: &'static [u8] = b"JubJub_XMD:BLAKE2b-512_RO_";
-            ExtendedPoint::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, &DST).into()
+            ExtendedPoint::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, DST).into()
         }
     }
 
@@ -901,14 +921,15 @@ pub mod jubjub_impls {
 #[cfg(feature = "pasta")]
 pub mod pasta_impls {
     use super::*;
-    use elliptic_curve::{group::GroupEncoding, hash2curve::ExpandMsgXmd, PrimeField};
     use elliptic_curve_tools::SumOfProducts;
-    use pasta::{
-        arithmetic::CurveExt,
+    use lit_rust_crypto::{
+        elliptic_curve::PrimeField,
+        group::GroupEncoding,
+        hash2curve::ExpandMsgXmd,
         pallas::{Pallas, Point as PallasPoint, Scalar as PallasScalar},
+        pasta::arithmetic::CurveExt,
         vesta::{Point as VestaPoint, Scalar as VestaScalar, Vesta},
     };
-    use pasta_curves as pasta;
 
     impl HashToScalar for PallasScalar {
         type Scalar = PallasScalar;
@@ -983,7 +1004,7 @@ pub mod pasta_impls {
 
         fn hash_to_scalar(m: &[u8]) -> Self::Scalar {
             const DST: &'static [u8] = b"Vesta_XMD:BLAKE2b-512";
-            VestaScalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, &DST)
+            VestaScalar::hash::<ExpandMsgXmd<blake2::Blake2b512>>(m, DST)
         }
     }
 

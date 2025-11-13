@@ -10,12 +10,12 @@ use super::{
     RandomizedConstraintSystem, Variable,
 };
 
+use crate::CtOptionOps;
 use crate::errors::R1CSError;
 use crate::generators::{BulletproofGens, PedersenGens};
 use crate::r1cs::Metrics;
 use crate::transcript::TranscriptProtocol;
 use crate::types::*;
-use crate::CtOptionOps;
 
 /// A [`ConstraintSystem`] implementation for use by the verifier.
 ///

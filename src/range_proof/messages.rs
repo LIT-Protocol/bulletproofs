@@ -9,7 +9,7 @@ extern crate alloc;
 use super::CtOptionOps;
 use alloc::vec::Vec;
 use core::iter;
-use group::{ff::Field, Group};
+use lit_rust_crypto::group::{Group, ff::Field};
 use serde::{Deserialize, Serialize};
 
 use crate::generators::{BulletproofGens, PedersenGens};

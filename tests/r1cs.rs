@@ -155,15 +155,17 @@ fn kshuffle_helper(k: usize) {
 
     {
         let mut verifier_transcript = Transcript::new(b"ShuffleProofTest");
-        assert!(proof
-            .verify(
-                &pc_gens,
-                &bp_gens,
-                &mut verifier_transcript,
-                &input_commitments,
-                &output_commitments
-            )
-            .is_ok());
+        assert!(
+            proof
+                .verify(
+                    &pc_gens,
+                    &bp_gens,
+                    &mut verifier_transcript,
+                    &input_commitments,
+                    &output_commitments
+                )
+                .is_ok()
+        );
     }
 }
 
@@ -391,8 +393,8 @@ pub fn range_proof<CS: ConstraintSystem>(
 
 #[test]
 fn range_proof_gadget() {
-    use rand::thread_rng;
     use rand::Rng;
+    use rand::thread_rng;
 
     let mut rng = thread_rng();
     let m = 3; // number of values to test per `n`

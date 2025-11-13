@@ -5,7 +5,7 @@ extern crate alloc;
 use alloc::vec::Vec;
 
 use core::iter;
-use group::ff::Field;
+use lit_rust_crypto::ff::Field;
 use merlin::Transcript;
 use rand_core::{CryptoRng, RngCore};
 
@@ -477,9 +477,11 @@ mod tests {
         .unwrap();
 
         let mut verifier_transcript = Transcript::new(b"linearprooftest");
-        assert!(proof
-            .verify(&mut verifier_transcript, &C, &G, &F, &B, b.clone())
-            .is_ok());
+        assert!(
+            proof
+                .verify(&mut verifier_transcript, &C, &G, &F, &B, b.clone())
+                .is_ok()
+        );
 
         // Test serialization and deserialization
         let serialized_proof = proof.to_bytes();
@@ -487,9 +489,11 @@ mod tests {
 
         let deserialized_proof = LinearProof::<C>::from_bytes(&serialized_proof).unwrap();
         let mut serde_verifier_transcript = Transcript::new(b"linearprooftest");
-        assert!(deserialized_proof
-            .verify(&mut serde_verifier_transcript, &C, &G, &F, &B, b)
-            .is_ok());
+        assert!(
+            deserialized_proof
+                .verify(&mut serde_verifier_transcript, &C, &G, &F, &B, b)
+                .is_ok()
+        );
     }
 
     #[test]

@@ -13,8 +13,8 @@ use alloc::vec::Vec;
 
 use core::iter;
 
-use group::ff::Field;
-use group::Group;
+use lit_rust_crypto::ff::Field;
+use lit_rust_crypto::group::Group;
 use merlin::Transcript;
 
 use crate::errors::ProofError;
@@ -726,9 +726,11 @@ mod tests {
             // 4. Verify with the same customization label as above
             let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
-            assert!(proof
-                .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
-                .is_ok());
+            assert!(
+                proof
+                    .verify_multiple(&bp_gens, &pc_gens, &mut transcript, &value_commitments, n)
+                    .is_ok()
+            );
         }
     }
 
@@ -1020,20 +1022,20 @@ mod tests {
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
         // Parties 0, 2 are honest and use a 32-bit value
-        let v0 = rng.gen::<u32>() as u64;
+        let v0 = rng.r#gen::<u32>() as u64;
         let v0_blinding = C::Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 
-        let v2 = rng.gen::<u32>() as u64;
+        let v2 = rng.r#gen::<u32>() as u64;
         let v2_blinding = C::Scalar::random(&mut rng);
         let party2 = Party::new(&bp_gens, &pc_gens, v2, v2_blinding, n).unwrap();
 
         // Parties 1, 3 are dishonest and use a 64-bit value
-        let v1 = rng.gen::<u64>();
+        let v1 = rng.r#gen::<u64>();
         let v1_blinding = C::Scalar::random(&mut rng);
         let party1 = Party::new(&bp_gens, &pc_gens, v1, v1_blinding, n).unwrap();
 
-        let v3 = rng.gen::<u64>();
+        let v3 = rng.r#gen::<u64>();
         let v3_blinding = C::Scalar::random(&mut rng);
         let party3 = Party::new(&bp_gens, &pc_gens, v3, v3_blinding, n).unwrap();
 
@@ -1121,7 +1123,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let mut transcript = Transcript::new(b"AggregatedRangeProofTest");
 
-        let v0 = rng.gen::<u32>() as u64;
+        let v0 = rng.r#gen::<u32>() as u64;
         let v0_blinding = C::Scalar::random(&mut rng);
         let party0 = Party::new(&bp_gens, &pc_gens, v0, v0_blinding, n).unwrap();
 

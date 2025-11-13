@@ -8,7 +8,7 @@ use alloc::borrow::Borrow;
 use alloc::vec::Vec;
 
 use core::iter;
-use group::ff::Field;
+use lit_rust_crypto::ff::Field;
 use merlin::Transcript;
 use serde::{Deserialize, Serialize};
 use subtle::ConstantTimeEq;
@@ -490,33 +490,37 @@ mod tests {
         );
 
         let mut verifier = Transcript::new(b"innerproducttest");
-        assert!(proof
-            .verify::<iter::Take<iter::Repeat<C::Scalar>>, iter::Take<util::ScalarExp<C>>>(
-                n,
-                &mut verifier,
-                iter::repeat(C::Scalar::ONE).take(n),
-                util::exp_iter(y_inv).take(n),
-                &P,
-                &Q,
-                &G,
-                &H
-            )
-            .is_ok());
+        assert!(
+            proof
+                .verify::<iter::Take<iter::Repeat<C::Scalar>>, iter::Take<util::ScalarExp<C>>>(
+                    n,
+                    &mut verifier,
+                    iter::repeat(C::Scalar::ONE).take(n),
+                    util::exp_iter(y_inv).take(n),
+                    &P,
+                    &Q,
+                    &G,
+                    &H
+                )
+                .is_ok()
+        );
 
         let proof = InnerProductProof::<C>::from_bytes(proof.to_bytes().as_slice()).unwrap();
         let mut verifier = Transcript::new(b"innerproducttest");
-        assert!(proof
-            .verify::<iter::Take<iter::Repeat<C::Scalar>>, iter::Take<util::ScalarExp<C>>>(
-                n,
-                &mut verifier,
-                iter::repeat(C::Scalar::ONE).take(n),
-                util::exp_iter(y_inv).take(n),
-                &P,
-                &Q,
-                &G,
-                &H
-            )
-            .is_ok());
+        assert!(
+            proof
+                .verify::<iter::Take<iter::Repeat<C::Scalar>>, iter::Take<util::ScalarExp<C>>>(
+                    n,
+                    &mut verifier,
+                    iter::repeat(C::Scalar::ONE).take(n),
+                    util::exp_iter(y_inv).take(n),
+                    &P,
+                    &Q,
+                    &G,
+                    &H
+                )
+                .is_ok()
+        );
     }
 
     #[test]

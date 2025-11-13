@@ -6,7 +6,7 @@ extern crate alloc;
 use crate::BulletproofCurveArithmetic;
 use alloc::vec;
 use alloc::vec::Vec;
-use group::ff::Field;
+use lit_rust_crypto::ff::Field;
 use zeroize::Zeroize;
 
 use crate::inner_product_proof::inner_product;

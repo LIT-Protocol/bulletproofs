@@ -14,7 +14,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::{iter, marker::PhantomData};
-use group::ff::Field;
+use lit_rust_crypto::group::ff::Field;
 use rand_core::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 

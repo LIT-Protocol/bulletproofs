@@ -10,7 +10,7 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use core::marker::PhantomData;
-use group::ff::Field;
+use lit_rust_crypto::ff::Field;
 use merlin::Transcript;
 
 use crate::errors::MPCError;

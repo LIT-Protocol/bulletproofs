@@ -2,7 +2,7 @@
 
 use core::borrow::BorrowMut;
 use core::mem;
-use group::{ff::Field, Group};
+use group::{Group, ff::Field};
 use merlin::Transcript;
 use zeroize::Zeroize;
 
